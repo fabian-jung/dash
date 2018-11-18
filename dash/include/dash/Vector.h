@@ -73,9 +73,6 @@ struct Vector_iterator {
 	position_index_t _index;
 	size_type _local_size;
 
-
-
-
 	position_index_t get_postion_index(index_type global_index) const {
 		position_index_t index { static_cast<global_unit_type>(0), 0 };
 // 		std::cout << "globabl index = " << global_index << std::endl;
@@ -249,8 +246,10 @@ public:
 	using allocator_type = allocator<value_type>;
 	using size_type = dash::default_size_t;
 	using index_type = dash::default_index_t;
-// 	using difference_type = ptrdiff_t;
+	using difference_type = ptrdiff_t;
 	using reference = dash::GlobRef<T>;
+	using local_reference = T&;
+
 	using const_reference = const T&;
 
 	using glob_mem_type = dash::GlobStaticMem<T, allocator<T>>;
@@ -260,7 +259,7 @@ public:
 	using iterator = Vector_iterator<self_type>;
 // 	using const_iterator = typename glob_mem_type::pointer;
 
-	using pointer = iterator;
+	using pointer = T*;
 // 	using const_pointer = const_iterator;
 
 	using local_pointer = typename glob_mem_type::local_pointer;
@@ -282,15 +281,18 @@ public:
 // 	Vector& operator=(const Vector& other) = delete;
 	Vector& operator=(Vector&& other) = default;
 //
-// 	reference at(size_type pos);
+	reference at(size_type pos);
+	local_reference lat(size_type pos);
 // 	const_reference at(size_type pos) const;
 //
 	reference operator[](size_type pos);
 // 	const_reference operator[](size_type pos) const;
 //
  	reference front();
+	local_reference lfront();
 // 	const_reference front() const;
  	reference back();
+	local_reference lback();
 // 	const_reference back() const;
 //
 //
@@ -308,16 +310,19 @@ public:
 // 	const_iterator cend() const;
 //
 //
-// 	bool empty() const;
+	bool empty();
+	bool lempty();
 	size_type lsize(); //const
 	size_type size(); //const
-// 	size_type max_size() const;
+	size_type max_size() const;
 //
  	void reserve(size_type cap_per_node);
 	size_type lcapacity() const;
 	size_type capacity() const;
-// 	void shrink_to_fit();
-// 	void clear();
+
+	// 	void shrink_to_fit();
+	void clear();
+	void lclear();
 // 	void resize(size_type count, const_reference value = value_type());
 //
 
@@ -338,7 +343,8 @@ public:
 // 	iterator emplace(const_iterator pos, Args&&... args);
 // 	iterator erase(iterator pos);
 // 	iterator erase(const_iterator pos);
-// 	iterator erase(iterator first, iterator last);
+	iterator erase(iterator first, iterator last);
+	pointer lerase(pointer first, pointer last);
 // 	iterator erase(const_iterator first, const_iterator last);
 //
 
@@ -349,7 +355,10 @@ public:
 //
 // 	template <class... Args>
 // 	void emplace_back(Args&&... args);
-// 	void pop_back();
+	void pop_back();
+	void lpop_back();
+
+	void lresize(size_type count);
 
 	void balance();
 	void commit();
@@ -366,7 +375,6 @@ private:
 	std::vector<value_type> local_queue;
 	std::vector<value_type> global_queue;
 }; // End of class Vector
-
 
 template <class T, template<class> class allocator>
 Vector<T,allocator>::Vector(
@@ -385,6 +393,21 @@ Vector<T,allocator>::Vector(
 }
 
 template <class T, template<class> class allocator>
+typename Vector<T,allocator>::reference Vector<T,allocator>::at(size_type pos) {
+	return begin()[pos];
+}
+
+template <class T, template<class> class allocator>
+typename Vector<T,allocator>::local_reference Vector<T,allocator>::lat(size_type pos) {
+	if(pos < lsize()) {
+		return begin()[pos];
+	} else {
+		throw std::out_of_range();
+	}
+}
+
+
+template <class T, template<class> class allocator>
 typename Vector<T,allocator>::reference Vector<T,allocator>::operator[](size_type pos) {
 	return begin()[pos];
 }
@@ -394,11 +417,22 @@ typename Vector<T,allocator>::reference Vector<T,allocator>::front() {
 	return *(begin());
 }
 
+
+template <class T, template<class> class allocator>
+typename Vector<T,allocator>::local_reference Vector<T,allocator>::lfront() {
+	return *(lbegin());
+}
+
+
 template <class T, template<class> class allocator>
 typename Vector<T,allocator>::reference Vector<T,allocator>::back() {
 	return *(begin()+(size()-1));
 }
 
+template <class T, template<class> class allocator>
+typename Vector<T,allocator>::local_reference Vector<T,allocator>::lback() {
+	return *(lbegin()+(lsize()-1));
+}
 
 template <class T, template<class> class allocator>
 typename Vector<T,allocator>::iterator Vector<T,allocator>::begin() {
@@ -422,6 +456,16 @@ typename Vector<T,allocator>::local_pointer Vector<T,allocator>::lend() {
 }
 
 template <class T, template<class> class allocator>
+bool Vector<T,allocator>::empty() {
+	return size() > 0;
+}
+
+template <class T, template<class> class allocator>
+bool Vector<T,allocator>::lempty() {
+	return lsize() > 0;
+}
+
+template <class T, template<class> class allocator>
 typename Vector<T, allocator>::size_type Vector<T, allocator>::lsize() {
 	return dash::atomic::load(*(_local_sizes.begin()+_team.myid()));
 }
@@ -436,21 +480,63 @@ typename Vector<T, allocator>::size_type Vector<T, allocator>::size() {
 }
 
 template <class T, template<class> class allocator>
+typename Vector<T, allocator>::size_type Vector<T, allocator>::max_size() const {
+	return std::numeric_limits<size_type>::max();
+}
+
+template <class T, template<class> class allocator>
 void Vector<T, allocator>::balance() {
-//  	commit();
 	_team.barrier();
+
 	const auto cap = capacity() / _team.size();
-	auto s = size() / _team.size();
-	const auto i = _team.myid();
-
+	const auto new_size = (size() + _team.size() - 1) / _team.size(); // Ceiling of size() / _team.size()
+	const auto myid = _team.myid();
 	glob_mem_type tmp(cap, _team);
-	std::copy(begin() + i*s, begin()+(i+1)*s, tmp.lbegin());
-// 	auto dest = tmp.begin() + i*cap;
-// 	auto gptr = static_cast<dart_gptr_t>(*(begin() + i*s));
-// 	dart_get_blocking(dest.local(), gptr, s, dart_datatype<T>::value, dart_datatype<T>::value);
+
+	using block_t = std::pair<dart_gptr_t, size_t>;
+	std::vector<block_t> blocks;
+
+	index_type begin_index = new_size * myid;
+	index_type end_index = std::max(new_size * (myid + 1), size());
+
+	index_type pos = 0;
+	index_type ls = dash::atomic::load(*(_local_sizes.begin()));
+	index_type id = 0;
+	index_type remaining = std::min(new_size, size() - myid * new_size);
+
+	while(pos + ls < begin_index) {
+		++id;
+		pos += ls;
+		ls = dash::atomic::load(*(_local_sizes.begin()+id));
+	}
+
+	auto loffset = (begin_index - pos);
+	index_type lsize = dash::atomic::load(*(_local_sizes.begin()+id));
+	auto tbegin = _data.begin() + (id*lcapacity() + loffset);
+	auto tsize = std::min(remaining, static_cast<index_type>(lcapacity() - loffset));
+	blocks.emplace_back(tbegin, tsize);
+
+
+	remaining -= tsize;
+	while(remaining > 0) {
+		++id;
+		lsize = dash::atomic::load(*(_local_sizes.begin()+id));
+		tbegin = _data.begin() + (id*lcapacity());
+		tsize = std::min(remaining, lsize);
+		blocks.emplace_back(tbegin, tsize);
+		remaining -= tsize;
+	}
+
+	auto dest = tmp.lbegin();
+	long unsigned int my_size = 0;
+	for(auto& block : blocks) {
+		dart_get_blocking(dest, block.first, block.second, dart_datatype<T>::value, dart_datatype<T>::value);
+		dest += block.second;
+		my_size += block.second;
+	}
 
 	_team.barrier();
-	dash::atomic::store(*(_local_sizes.begin()+i), s);
+	dash::atomic::store(*(_local_sizes.begin()+myid), my_size);
 	_data = std::move(tmp);
 	_team.barrier();
 }
@@ -517,6 +603,19 @@ template <class T, template<class> class allocator>
 typename Vector<T, allocator>::size_type Vector<T, allocator>::capacity() const {
 	return _data.size();
 }
+
+template <class T, template<class> class allocator>
+void Vector<T, allocator>::lclear() {
+	dash::atomic::store(*(_local_sizes.begin()+_team.myid()), 0);
+}
+
+template <class T, template<class> class allocator>
+void Vector<T, allocator>::clear() {
+	for(auto i = 0; i < _team.size(); ++i) {
+		dash::atomic::store(*(_local_sizes.begin()+i), 0);
+	}
+}
+
 
 template <class T, template<class> class allocator>
 void Vector<T, allocator>::reserve(size_type new_cap) {
@@ -622,6 +721,28 @@ void Vector<T, allocator>::insert(InputIt first, InputIt last) {
 }
 
 template <class T, template<class> class allocator>
+typename Vector<T, allocator>::iterator Vector<T, allocator>::erase(iterator first,iterator  last) {
+	const auto dist = std::distance(first, last);
+	auto back_fill_it = first + dist;
+	for(auto i = first; i !=  end() - dist; ++i) {
+		*i = *back_fill_it;
+		++back_fill_it;
+	}
+	dash::atomic::sub(*(_local_sizes.begin() + _team.size() - 1), dist);
+}
+
+template <class T, template<class> class allocator>
+typename Vector<T, allocator>::pointer Vector<T, allocator>::lerase(pointer first, pointer last) {
+	const auto dist = std::distance(first, last);
+	auto back_fill_it = first + dist;
+	for(auto i = first; i !=  lend() - dist; ++i) {
+		*i = *back_fill_it;
+		++back_fill_it;
+	}
+	dash::atomic::sub(*(_local_sizes.begin() + _team.myid()), dist);
+}
+
+template <class T, template<class> class allocator>
 void Vector<T, allocator>::lpush_back(const T& value, vector_strategy_t strategy) {
 	if(strategy == vector_strategy_t::CACHE) {
 		local_queue.push_back(value);
@@ -661,6 +782,26 @@ void Vector<T, allocator>::push_back(const T& value,  vector_strategy_t strategy
 	}
 }
 
+template <class T, template<class> class allocator>
+void Vector<T, allocator>::pop_back() {
+	dash::atomic::sub(*(_local_sizes.begin() + _team.size() - 1), 1);
+}
+
+template <class T, template<class> class allocator>
+void Vector<T, allocator>::lpop_back() {
+	dash::atomic::sub(*(_local_sizes.begin()+_team.myid()), 1);
+}
+
+template <class T, template<class> class allocator>
+void Vector<T, allocator>::lresize(size_type count) {
+	const auto lsize = lsize();
+	reserve(count);
+	if(count > lsize) {
+		std::fill(lend(), lend() + count - lsize, T{});
+	}
+	dash::atomic::store(*(_local_sizes.begin()+_team.myid()), count);
+}
+
 // template<class T>
 // LocalRange<typename Vector<T>::value_type>
 // local_range(
@@ -672,6 +813,48 @@ void Vector<T, allocator>::push_back(const T& value,  vector_strategy_t strategy
 // 	return LocalRange<typename Vector<T>::value_type>(first._vec.lbegin(), first._vec.lend());
 // }
 
+namespace detail {
+	template<class InputIt1, class InputIt2, class Compare>
+	bool lexicographical_compare(InputIt1 first1, InputIt1 last1,
+								InputIt2 first2, InputIt2 last2,
+								Compare comp)
+	{
+		for ( ; (first1 != last1) && (first2 != last2); ++first1, (void) ++first2 ) {
+			if (comp(*first1, *first2)) return true;
+			if (comp(*first2, *first1)) return false;
+		}
+		return (first1 == last1) && (first2 != last2);
+	}
+}
+template <class T, template<class> class allocator>
+bool operator==(const dash::Vector<T, allocator>& lhs, const dash::Vector<T, allocator>& rhs) {
+	return detail::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), std::equal_to<T>());
+}
+
+template <class T, template<class> class allocator>
+bool operator!=(const dash::Vector<T, allocator>& lhs, const dash::Vector<T, allocator>& rhs) {
+	return detail::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), std::not_equal_to<T>());
+}
+
+template <class T, template<class> class allocator>
+bool operator<=(const dash::Vector<T, allocator>& lhs, const dash::Vector<T, allocator>& rhs) {
+	return detail::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), std::less_equal<T>());
+}
+
+template <class T, template<class> class allocator>
+bool operator<(const dash::Vector<T, allocator>& lhs, const dash::Vector<T, allocator>& rhs) {
+	return detail::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), std::less<T>());
+}
+
+template <class T, template<class> class allocator>
+bool operator>=(const dash::Vector<T, allocator>& lhs, const dash::Vector<T, allocator>& rhs) {
+	return detail::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), std::greater_equal<T>());
+}
+
+template <class T, template<class> class allocator>
+bool operator>(const dash::Vector<T, allocator>& lhs, const dash::Vector<T, allocator>& rhs) {
+	return detail::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), std::greater<T>());
+}
 
 } // End of namespace dash
 

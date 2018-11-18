@@ -120,11 +120,17 @@ int main(int argc, char* argv[])
 		vec.push_back(42);
 		vec.push_back(1337);
  		print_vector(vec, 0);
+	}
 
-		std::cout << "local_size = " << vec.lsize() << std::endl;
+	{
+		dash::Vector<int> vec;
+		std::vector<int> buff { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 };
+		if(myid == 0) vec.linsert(buff.begin(), buff.end());
+		vec.commit();
 		if(myid == 0) std::cout << "dash::vector::balance()" << std::endl;
 		vec.balance();
-// 		std::cout << "local_size = " << vec.lsize() << std::endl;
+		std::cout << "local_size = " << vec.lsize() << std::endl;
+		// 		std::cout << "local_size = " << vec.lsize() << std::endl;
 		print_vector(vec, 0);
 	}
 
@@ -204,9 +210,18 @@ int main(int argc, char* argv[])
 		print_vector(vec, 0);
 	}
 
-
-	constexpr size_t max_elements = 10'000'000'000;
-	constexpr size_t max_runs = 100;
+// 	{
+// 		std::cout << "Sort Test" << std::endl;
+// 		std::vector<int> values { 1, 2, 3, 4, 5 };
+// 		dash::Vector<int> vec;
+// 		vec.insert(values.begin(), values.end());
+// 		vec.commit();
+// 		print_vector(vec, 0);
+// 		dash::sort(vec.begin(), vec.end());
+// 		print_vector(vec, 0);
+// 	}
+	constexpr size_t max_elements = 100'000'000;
+	constexpr size_t max_runs = 1;
 
 	/*
 
