@@ -3,6 +3,8 @@
 
 #include <dash/dart/if/dart.h>
 #include <dash/Types.h>
+#include <dash/profiling/Profiler.h>
+
 
 /**
  * \defgroup  DashLib  DASH Library Runtime Interface
@@ -106,6 +108,8 @@ namespace dash
    */
   [[noreturn]]
   void   abort(int errorcode);
+
+  extern Profiler profiler;
 
 } // namespace dash
 

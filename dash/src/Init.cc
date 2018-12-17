@@ -10,10 +10,10 @@
 
 #include <dash/internal/Annotation.h>
 
-
 namespace dash {
   static bool _initialized   = false;
   static bool _multithreaded = false;
+  Profiler profiler;
 }
 
 namespace dash {
@@ -65,6 +65,8 @@ void dash::init(int * argc, char ** *argv)
     }
     dash::barrier();
   }
+
+  profiler.setId(dash::myid());
 
   DASH_LOG_DEBUG("dash::init", "dash::util::Locality::init()");
   dash::util::Locality::init();

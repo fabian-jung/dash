@@ -17,6 +17,8 @@
 
 #include <dash/memory/MemorySpaceBase.h>
 
+#include <dash/profiling/TracedPointer.h>
+
 std::ostream &operator<<(std::ostream &os, const dart_gptr_t &dartptr);
 
 bool operator==(const dart_gptr_t &lhs, const dart_gptr_t &rhs);
@@ -30,11 +32,11 @@ template <typename T>
 class GlobRef;
 
 template <class T, class MemSpaceT>
-class GlobPtr;
+class GlobPtrImpl;
 
 template <class T, class MemSpaceT>
 dash::gptrdiff_t distance(
-    GlobPtr<T, MemSpaceT> gbegin, GlobPtr<T, MemSpaceT> gend);
+    GlobPtrImpl<T, MemSpaceT> gbegin, GlobPtrImpl<T, MemSpaceT> gend);
 
 /**
  * Pointer in global memory space with random access arithmetics.
@@ -44,9 +46,9 @@ dash::gptrdiff_t distance(
  * \concept{DashMemorySpaceConcept}
  */
 template <typename ElementType, class GlobMemT>
-class GlobPtr {
+class GlobPtrImpl {
 private:
-  typedef GlobPtr<ElementType, GlobMemT> self_t;
+  typedef GlobPtrImpl<ElementType, GlobMemT> self_t;
 
   using local_pointer_traits =
       std::pointer_traits<typename GlobMemT::local_void_pointer>;
@@ -55,7 +57,7 @@ private:
 
 public:
   typedef ElementType                          value_type;
-  typedef GlobPtr<const ElementType, GlobMemT> const_type;
+  typedef GlobPtrImpl<const ElementType, GlobMemT> const_type;
   typedef typename GlobMemT::index_type        index_type;
   typedef typename GlobMemT::size_type         size_type;
   typedef index_type                           gptrdiff_t;
@@ -72,19 +74,19 @@ public:
    * Rebind to a different type of pointer
    */
   template <typename T>
-  using rebind = dash::GlobPtr<T, GlobMemT>;
+  using rebind = dash::GlobPtrImpl<T, GlobMemT>;
 
 public:
   template <typename T, class MemSpaceT>
-  friend class GlobPtr;
+  friend class GlobPtrImpl;
 
   template <typename T, class MemSpaceT>
   friend std::ostream &operator<<(
-      std::ostream &os, const GlobPtr<T, MemSpaceT> &gptr);
+      std::ostream &os, const GlobPtrImpl<T, MemSpaceT> &gptr);
 
   template <class T, class MemSpaceT>
   friend dash::gptrdiff_t distance(
-      GlobPtr<T, MemSpaceT> gbegin, GlobPtr<T, MemSpaceT> gend);
+      GlobPtrImpl<T, MemSpaceT> gbegin, GlobPtrImpl<T, MemSpaceT> gend);
 
 private:
   // Raw global pointer used to initialize this pointer instance
@@ -93,12 +95,12 @@ public:
   /**
    * Default constructor, underlying global address is unspecified.
    */
-  constexpr GlobPtr() = default;
+  constexpr GlobPtrImpl() = default;
 
   /**
    * Constructor, specifies underlying global address.
    */
-  explicit constexpr GlobPtr(dart_gptr_t gptr)
+  explicit constexpr GlobPtrImpl(dart_gptr_t gptr)
     : m_dart_pointer(gptr)
   {
   }
@@ -106,7 +108,7 @@ public:
   /**
    * Constructor for conversion of std::nullptr_t.
    */
-  explicit constexpr GlobPtr(std::nullptr_t)
+  explicit constexpr GlobPtrImpl(std::nullptr_t)
     : m_dart_pointer(DART_GPTR_NULL)
   {
   }
@@ -114,7 +116,7 @@ public:
   /**
    * Copy constructor.
    */
-  constexpr GlobPtr(const self_t &other) = default;
+  constexpr GlobPtrImpl(const self_t &other) = default;
 
   /**
    * Assignment operator.
@@ -129,21 +131,21 @@ public:
    *     pointer type to a void pointer and back again.
    *   - From::value_type& is assignable to value_type&.
    *
-   * NOTE: Const correctness is considered. We can assign a GlobPtr<const T>
-   *       to a GlobPtr<T> but not the other way around
+   * NOTE: Const correctness is considered. We can assign a GlobPtrImpl<const T>
+   *       to a GlobPtrImpl<T> but not the other way around
    */
   //clang-format on
   template <
       typename From,
       typename = typename std::enable_if<
-          // We always allow GlobPtr<T> -> GlobPtr<void> or the other way)
+          // We always allow GlobPtrImpl<T> -> GlobPtrImpl<void> or the other way)
           // or if From is assignable to To (value_type)
           dash::internal::is_pointer_assignable<
               typename dash::remove_atomic<From>::type,
               typename dash::remove_atomic<value_type>::type>::value>
 
       ::type>
-  constexpr GlobPtr(const GlobPtr<From, GlobMemT> &other)
+  constexpr GlobPtrImpl(const GlobPtrImpl<From, GlobMemT> &other)
     : m_dart_pointer(other.m_dart_pointer)
   {
   }
@@ -151,7 +153,7 @@ public:
   /**
    * Move constructor.
    */
-  constexpr GlobPtr(self_t &&other) = default;
+  constexpr GlobPtrImpl(self_t &&other) = default;
 
   /**
    * Move-assignment operator.
@@ -160,7 +162,7 @@ public:
 
   /**
    * Converts pointer to its referenced native pointer or
-   * \c nullptr if the \c GlobPtr does not point to a local
+   * \c nullptr if the \c GlobPtrImpl does not point to a local
    * address.
    */
   explicit operator value_type *() const noexcept
@@ -172,7 +174,7 @@ public:
    * Conversion operator to local pointer.
    *
    * \returns  A native pointer to the local element referenced by this
-   *           GlobPtr instance, or \c nullptr if the referenced element
+   *           GlobPtrImpl instance, or \c nullptr if the referenced element
    *           is not local to the calling unit.
    */
   explicit operator value_type *() noexcept
@@ -293,8 +295,8 @@ public:
   /**
    * Equality comparison operator.
    */
-  // template <class GlobPtrT>
-  constexpr bool operator==(const GlobPtr &other) const noexcept
+  // template <class GlobPtrImplT>
+  constexpr bool operator==(const GlobPtrImpl &other) const noexcept
   {
     return DART_GPTR_EQUAL(
         static_cast<dart_gptr_t>(m_dart_pointer),
@@ -499,7 +501,7 @@ private:
 };
 
 template <typename T, class MemSpaceT>
-std::ostream &operator<<(std::ostream &os, const GlobPtr<T, MemSpaceT> &gptr)
+std::ostream &operator<<(std::ostream &os, const GlobPtrImpl<T, MemSpaceT> &gptr)
 {
   std::ostringstream ss;
   char               buf[100];
@@ -533,9 +535,9 @@ std::ostream &operator<<(std::ostream &os, const GlobPtr<T, MemSpaceT> &gptr)
 template <class T, class MemSpaceT>
 dash::gptrdiff_t distance(
     // First global pointer in range
-    GlobPtr<T, MemSpaceT> gbegin,
+    GlobPtrImpl<T, MemSpaceT> gbegin,
     // Final global pointer in range
-    GlobPtr<T, MemSpaceT> gend)
+    GlobPtrImpl<T, MemSpaceT> gend)
 {
   using memory_space_traits = dash::memory_space_traits<MemSpaceT>;
 
@@ -577,15 +579,45 @@ DASH_CONSTEXPR inline typename std::enable_if<
             MemSpaceT>::memory_space_layout_tag,
         memory_space_contiguous>::value,
     T>::type *
-local_begin(GlobPtr<T, MemSpaceT> global_begin, dash::team_unit_t unit)
+local_begin(GlobPtrImpl<T, MemSpaceT> global_begin, dash::team_unit_t unit)
     DASH_NOEXCEPT
 {
   // reset offset to 0
   auto dart_gptr                = static_cast<dart_gptr_t>(global_begin);
   dart_gptr.unitid              = unit.id;
   dart_gptr.addr_or_offs.offset = 0;
-  return GlobPtr<T, MemSpaceT>(dart_gptr).local();
+  return GlobPtrImpl<T, MemSpaceT>(dart_gptr).local();
 }
+
+template <class T, class MemSpaceT>
+class GlobPtr : public TracedPointer<GlobPtrImpl<T, MemSpaceT>> {
+public:
+	using gptrdiff_t = typename GlobPtrImpl<T, MemSpaceT>::gptrdiff_t;
+	using index_type = typename GlobPtrImpl<T, MemSpaceT>::index_type;
+
+	template <typename Y>
+	using rebind = dash::GlobPtrImpl<Y, MemSpaceT>;
+
+	operator dart_gptr_t () const {
+		return static_cast<dart_gptr_t>(this->native());
+	}
+
+	GlobPtr(const TracedPointer<GlobPtrImpl<T, MemSpaceT>>& conv) :
+		TracedPointer<GlobPtrImpl<T, MemSpaceT>>(conv)
+	{}
+
+	GlobPtr(const GlobPtrImpl<T, MemSpaceT>& conv) :
+		TracedPointer<GlobPtrImpl<T, MemSpaceT>>(conv)
+	{}
+
+	GlobPtr(const dart_gptr_t& gptr) :
+		TracedPointer<GlobPtrImpl<T, MemSpaceT>>(gptr)
+	{}
+
+	dart_gptr_t dart_gptr() const {
+		return static_cast<dart_gptr_t>(*this);
+	}
+};
 
 }  // namespace dash
 
