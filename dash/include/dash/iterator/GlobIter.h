@@ -2,8 +2,8 @@
 #define DASH__GLOB_ITER_H__INCLUDED
 
 #include <dash/GlobPtr.h>
+#include <dash/GlobPtrImpl.hpp>
 #include <dash/GlobRef.h>
-#include <dash/Pattern.h>
 
 #include <functional>
 #include <sstream>

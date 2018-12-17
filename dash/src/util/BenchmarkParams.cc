@@ -11,6 +11,7 @@
 #include <dash/util/Config.h>
 #include <dash/internal/Config.h>
 #include <dash/util/Locality.h>
+#include <dash/util/UnitLocality.h>
 #include <dash/Array.h>
 #include <dash/Version.h>
 

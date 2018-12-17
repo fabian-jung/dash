@@ -1,6 +1,8 @@
 #ifndef DASH__ALGORITHM__COPY_H__
 #define DASH__ALGORITHM__COPY_H__
 
+#include <dash/GlobPtrImpl.hpp>
+#include <dash/GlobRefImpl.h>
 #include <dash/Future.h>
 #include <dash/Iterator.h>
 #include <dash/internal/Config.h>

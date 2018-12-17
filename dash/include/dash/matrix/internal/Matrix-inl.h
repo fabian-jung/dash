@@ -96,6 +96,7 @@ inline Matrix<T, NumDim, IndexT, PatternT, LocalMemT>::Matrix(self_t&& other)
   , _ref(other._ref)
 {
   // do not free other globmem
+  Profiler::get().container_move(other, *this);
   other._lbegin = nullptr;
   other._lend   = nullptr;
   other._begin  = iterator{};
@@ -119,6 +120,7 @@ Matrix<T, NumDim, IndexT, PatternT, LocalMemT>
 ::operator= (
   Matrix<T, NumDim, IndexT, PatternT, LocalMemT> && other)
 {
+  Profiler::get().container_move(other, *this);
   if (this == &other) {
     return *this;
   }
@@ -206,6 +208,8 @@ bool Matrix<T, NumDim, IndexT, PatternT, LocalMemT>
 ::allocate(
   const PatternT & pattern)
 {
+  decltype(auto) profiler = Profiler::get();
+  profiler.container_unregister(*this);
   DASH_LOG_TRACE("Matrix.allocate()", "pattern",
                  pattern.memory_layout().extents());
   if (&_pattern != &pattern) {
@@ -251,6 +255,7 @@ bool Matrix<T, NumDim, IndexT, PatternT, LocalMemT>
   _ref._refview    = MatrixRefView_t(this);
   local            = local_type(this);
   DASH_LOG_TRACE("Matrix.allocate() finished");
+  profiler.container_register(*this);
   return true;
 }
 
@@ -288,6 +293,7 @@ template <typename T, dim_t NumDim, typename IndexT, class PatternT, typename Lo
 void Matrix<T, NumDim, IndexT, PatternT, LocalMemT>
 ::deallocate()
 {
+  Profiler::get().container_unregister(*this);
   DASH_LOG_TRACE_VAR("Matrix.deallocate()", this);
   // Assure all units are synchronized before deallocation, otherwise
   // other units might still be working on the matrix:

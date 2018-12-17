@@ -17,6 +17,9 @@
 #include <dash/memory/UniquePtr.h>
 #include <dash/pattern/BlockPattern1D.h>
 
+#include <dash/profiling/TracedPointer.h>
+#include <dash/profiling/Profiler.h>
+
 #include <iterator>
 #include <initializer_list>
 #include <type_traits>
@@ -131,11 +134,11 @@ public:
   typedef       T &                                           reference;
   typedef const T &                                     const_reference;
 
-  typedef       T *                                             pointer;
-  typedef const T *                                       const_pointer;
+  typedef       TracedPointer<T*>                                pointer;
+  typedef		TracedPointer<const T*>                    const_pointer;
 
-  typedef       T *                                            iterator;
-  typedef const T *                                      const_iterator;
+  typedef       TracedPointer<T*>                               iterator;
+  typedef       TracedPointer<const T*>                   const_iterator;
 
 public:
   /// Type alias for LocalArrayRef<T,I,P>::view_type
@@ -558,9 +561,9 @@ public:
   /// View representing elements in the active unit's local memory.
   inline    local_type          sub_local()              noexcept;
   /// Pointer to first element in local range.
-  constexpr ElementType       * lbegin()           const noexcept;
+  constexpr TracedPointer<ElementType*>    lbegin()           const noexcept;
   /// Pointer past final element in local range.
-  constexpr ElementType       * lend()             const noexcept;
+  constexpr TracedPointer<ElementType*>    lend()             const noexcept;
 
   reference operator[](
     /// The position of the element to return
@@ -905,6 +908,7 @@ public:
     , m_lend(other.m_lend)
     , m_myid(other.m_myid)
   {
+	Profiler::get().container_move(other, *this);
     other.m_begin  = iterator{};
     other.m_end    = iterator{};
     other.m_lbegin = nullptr;
@@ -947,6 +951,7 @@ public:
    * The underlying memory does not have to be movable (it might).
    */
   self_t & operator=(self_t && other) {
+	Profiler::get().container_move(other, *this);
     if (this == &other) {
       return *this;
     }
@@ -1070,28 +1075,28 @@ public:
   /**
    * Native pointer to the first local element in the array.
    */
-  constexpr const ElementType * lbegin() const noexcept {
+  constexpr TracedPointer<const ElementType*> lbegin() const noexcept {
     return m_lbegin;
   }
 
   /**
    * Native pointer to the first local element in the array.
    */
-  ElementType * lbegin() noexcept {
+  TracedPointer<ElementType*> lbegin() noexcept {
     return m_lbegin;
   }
 
   /**
    * Native pointer to the end of the array.
    */
-  constexpr const ElementType * lend() const noexcept {
+  constexpr TracedPointer<const ElementType*> lend() const noexcept {
     return m_lend;
   }
 
   /**
    * Native pointer to the end of the array.
    */
-  ElementType * lend() noexcept {
+  TracedPointer<ElementType*> lend() noexcept {
     return m_lend;
   }
 
@@ -1399,6 +1404,7 @@ public:
 
   void deallocate()
   {
+	Profiler::get().container_unregister(*this);
     DASH_LOG_TRACE_VAR("Array.deallocate()", this);
     DASH_LOG_TRACE_VAR("Array.deallocate()", m_size);
     // Assure all units are synchronized before deallocation, otherwise
@@ -1445,7 +1451,9 @@ private:
 
   void do_allocate() {
     //reset old data
-    m_data.reset();
+	decltype(auto) profiler = Profiler::get();
+    profiler.container_unregister(*this);
+	m_data.reset();
 
     m_team      = &(m_pattern.team());
     m_globmem   = memory_type{*m_team};
@@ -1476,6 +1484,7 @@ private:
     // Global iterators:
     m_begin = iterator(&m_globmem, m_pattern);
     m_end   = iterator(m_begin) + m_size;
+	profiler.container_register(*this);
   }
 
   bool allocate(std::initializer_list<value_type> local_elements)

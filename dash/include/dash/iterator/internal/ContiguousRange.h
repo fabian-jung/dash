@@ -156,7 +156,7 @@ private:
  * Specialization for GlobPtr.
  */
 template<typename ValueType, typename GlobMemT>
-struct ContiguousRangeIterator<dash::GlobPtr<ValueType, GlobMemT>> {
+struct ContiguousRangeIterator<dash::GlobPtrImpl<ValueType, GlobMemT>> {
 
 public:
   /// Iterator Traits

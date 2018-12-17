@@ -10,7 +10,6 @@
 
 #include <dash/internal/Annotation.h>
 
-
 namespace dash {
   static bool _initialized   = false;
   static bool _multithreaded = false;
@@ -73,6 +72,7 @@ void dash::init(int * argc, char ** *argv)
 
 void dash::finalize()
 {
+	Profiler::get().report("Final");
   DASH_LOG_DEBUG("dash::finalize()");
   // Check init status of DASH
   if (!dash::is_initialized()) {

@@ -9,9 +9,6 @@
 
 namespace dash {
 
-// Forward declaration
-template<typename T, class MemSpaceT> class GlobPtr;
-
 template<
   typename T,
   typename GlobalPointerType>

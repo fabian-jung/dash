@@ -1,6 +1,8 @@
 #ifndef DASH__MEMORY__GLOB_LOCAL_MEMORY_H__INCLUDED
 #define DASH__MEMORY__GLOB_LOCAL_MEMORY_H__INCLUDED
 
+#include <dash/GlobPtr.h>
+#include <dash/GlobPtrImpl.hpp>
 #include <dash/Exception.h>
 #include <dash/allocator/AllocationPolicy.h>
 #include <dash/memory/MemorySpaceBase.h>
@@ -13,9 +15,6 @@ inline MemorySpace<MSpaceDomainCategory, MSpaceTypeCategory>*
 get_default_memory_space();
 
 class HostSpace;
-
-template <class ElementType, class MemorySpace>
-class GlobPtr;
 
 template <class LMemSpace>
 class GlobLocalMemoryPool : public MemorySpace<

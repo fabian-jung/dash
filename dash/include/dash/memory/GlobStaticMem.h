@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <numeric>
 
+#include <dash/GlobPtrImpl.hpp>
 #include <dash/Exception.h>
 #include <dash/allocator/AllocationPolicy.h>
 #include <dash/memory/MemorySpaceBase.h>
@@ -156,7 +157,7 @@ public:
 
   constexpr const_void_pointer begin() const noexcept
   {
-    return const_void_pointer(m_begin);
+    return const_void_pointer(static_cast<const dart_gptr_t>(m_begin));
   }
 
   constexpr void_pointer end() noexcept
