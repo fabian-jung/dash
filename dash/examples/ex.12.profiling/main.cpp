@@ -7,11 +7,11 @@ int main(int argc, char* argv[]) {
 	const auto myid = dash::myid();
 	const auto size = dash::size();
 
-	dash::Array<int> arr(size * 5);
+	dash::Array<int> arr(size);
 
 // 	dash::fill(arr.begin(), arr.end(), 42);
 // 	auto gptr = arr.data();
-	for(auto i = 0; i < 5*size; ++i) {
+	for(auto i = 0; i < size; ++i) {
 		arr[i] = i;
 	}
 

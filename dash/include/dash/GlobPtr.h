@@ -29,7 +29,7 @@ namespace dash {
 
   // Forward-declarations
 template <typename T>
-class GlobRef;
+class GlobRefImpl;
 
 template <class T, class MemSpaceT>
 class GlobPtrImpl;
@@ -359,33 +359,33 @@ public:
   /**
    * Subscript operator.
    */
-  constexpr GlobRef<const value_type> operator[](gptrdiff_t n) const
+  constexpr GlobRefImpl<const value_type> operator[](gptrdiff_t n) const
   {
-    return GlobRef<const value_type>(self_t((*this) + n));
+    return GlobRefImpl<const value_type>(self_t((*this) + n));
   }
 
   /**
    * Subscript assignment operator.
    */
-  GlobRef<value_type> operator[](gptrdiff_t n)
+    GlobRefImpl<value_type> operator[](gptrdiff_t n)
   {
-    return GlobRef<value_type>(self_t((*this) + n));
+    return GlobRefImpl<value_type>(self_t((*this) + n));
   }
 
   /**
    * Dereference operator.
    */
-  GlobRef<value_type> operator*()
+    GlobRefImpl<value_type> operator*()
   {
-    return GlobRef<value_type>(*this);
+    return GlobRefImpl<value_type>(*this);
   }
 
   /**
    * Dereference operator.
    */
-  constexpr GlobRef<const value_type> operator*() const
+  constexpr GlobRefImpl<const value_type> operator*() const
   {
-    return GlobRef<const value_type>(*this);
+    return GlobRefImpl<const value_type>(*this);
   }
 
   /**
@@ -589,18 +589,22 @@ local_begin(GlobPtrImpl<T, MemSpaceT> global_begin, dash::team_unit_t unit)
   return GlobPtrImpl<T, MemSpaceT>(dart_gptr).local();
 }
 
+
+// TODO enable / disable tracing
 template <class T, class MemSpaceT>
 class GlobPtr : public TracedPointer<GlobPtrImpl<T, MemSpaceT>> {
+	using base = GlobPtrImpl<T, MemSpaceT>;
 public:
 	using gptrdiff_t = typename GlobPtrImpl<T, MemSpaceT>::gptrdiff_t;
 	using index_type = typename GlobPtrImpl<T, MemSpaceT>::index_type;
+	using value_type = typename GlobPtrImpl<T, MemSpaceT>::value_type;
 
 	template <typename Y>
 	using rebind = dash::GlobPtrImpl<Y, MemSpaceT>;
 
-	operator dart_gptr_t () const {
-		return static_cast<dart_gptr_t>(this->native());
-	}
+	GlobPtr() :
+		TracedPointer<GlobPtrImpl<T, MemSpaceT>>()
+	{}
 
 	GlobPtr(const TracedPointer<GlobPtrImpl<T, MemSpaceT>>& conv) :
 		TracedPointer<GlobPtrImpl<T, MemSpaceT>>(conv)
@@ -610,13 +614,64 @@ public:
 		TracedPointer<GlobPtrImpl<T, MemSpaceT>>(conv)
 	{}
 
-	GlobPtr(const dart_gptr_t& gptr) :
-		TracedPointer<GlobPtrImpl<T, MemSpaceT>>(gptr)
+	GlobPtr(dart_gptr_t& gptr) :
+		TracedPointer<GlobPtrImpl<T, MemSpaceT>>(GlobPtrImpl<T, MemSpaceT>(gptr))
 	{}
 
-	dart_gptr_t dart_gptr() const {
-		return static_cast<dart_gptr_t>(*this);
+	template <
+		typename From,
+		typename = decltype(TracedPointer<GlobPtrImpl<T, MemSpaceT>>(std::declval<GlobPtrImpl<From, MemSpaceT>>()))
+		/*typename std::enable_if<
+			// We always allow GlobPtrImpl<T> -> GlobPtrImpl<void> or the other way)
+			// or if From is assignable to To (value_type)
+			dash::internal::is_pointer_assignable<
+				typename dash::remove_atomic<From>::type,
+				typename dash::remove_atomic<value_type>::type>::value>
+		::type>*/
+	>
+	constexpr GlobPtr(const GlobPtrImpl<From, MemSpaceT>& conv) :
+		TracedPointer<GlobPtrImpl<T, MemSpaceT>>(conv)
+	{
 	}
+
+	template <
+		typename From,
+		typename = decltype(TracedPointer<GlobPtrImpl<T, MemSpaceT>>(std::declval<GlobPtrImpl<From, MemSpaceT>>()))
+// 		typename = typename std::enable_if<
+// 			// We always allow GlobPtrImpl<T> -> GlobPtrImpl<void> or the other way)
+// 			// or if From is assignable to To (value_type)
+// 			dash::internal::is_pointer_assignable<
+// 				typename dash::remove_atomic<From>::type,
+// 				typename dash::remove_atomic<value_type>::type>::value>
+//
+// 		::type
+	>
+	constexpr GlobPtr(const GlobPtr<From, MemSpaceT>& conv) :
+		TracedPointer<GlobPtrImpl<T, MemSpaceT>>(conv)
+	{
+	}
+
+	void set_unit(team_unit_t unit_id) {
+		this->traced_call(&base::set_unit, unit_id);
+	}
+
+	dart_gptr_t dart_gptr() const {
+		return this->traced_call(&base::dart_gptr);
+	}
+
+	value_type *local() {
+		return this->traced_call(static_cast<value_type* (base::*)()>(&base::local));
+	}
+
+	const value_type * local() const {
+		return this->traced_call(static_cast<value_type* (base::*)() const>(&base::local));
+	}
+
+	operator dart_gptr_t () const {
+		// after converting to dart_gptr_t all tracing is impossible
+		return this->traced_call(&base::operator dart_gptr_t);
+	}
+
 };
 
 }  // namespace dash

@@ -1,5 +1,5 @@
-#ifndef DASH__ATOMIC_GLOBREF_H_
-#define DASH__ATOMIC_GLOBREF_H_
+#ifndef DASH__ATOMIC_GlobRefImpl_H_
+#define DASH__ATOMIC_GlobRefImpl_H_
 
 #include <dash/GlobPtr.h>
 //#include <dash/Types.h>
@@ -17,10 +17,10 @@ template <typename T>
 class GlobAsyncRef;
 /**
  * Specialization for atomic values. All atomic operations are
- * \c const as the \c GlobRef does not own the atomic values.
+ * \c const as the \c GlobRefImpl does not own the atomic values.
  */
 template <typename T>
-class GlobRef<dash::Atomic<T>> {
+class GlobRefImpl<dash::Atomic<T>> {
   /* Notes on type compatibility:
    *
    * - The general support of atomic operations on values of type T is
@@ -32,7 +32,7 @@ class GlobRef<dash::Atomic<T>> {
    */
 
   template <typename U>
-  friend std::ostream& operator<<(std::ostream& os, const GlobRef<U>& gref);
+  friend std::ostream& operator<<(std::ostream& os, const GlobRefImpl<U>& gref);
 
 public:
   using value_type          = T;
@@ -41,9 +41,9 @@ public:
   using atomic_t            = dash::Atomic<T>;
   using const_atomic_t      = typename dash::Atomic<const_value_type>;
   using nonconst_atomic_t   = typename dash::Atomic<nonconst_value_type>;
-  using self_t              = GlobRef<atomic_t>;
-  using const_type          = GlobRef<const_atomic_t>;
-  using nonconst_type       = GlobRef<dash::Atomic<nonconst_value_type>>;
+  using self_t              = GlobRefImpl<atomic_t>;
+  using const_type          = GlobRefImpl<const_atomic_t>;
+  using nonconst_type       = GlobRefImpl<dash::Atomic<nonconst_value_type>>;
 
 private:
   dart_gptr_t _gptr{};
@@ -53,39 +53,39 @@ public:
   /**
    * Reference semantics forbid declaration without definition.
    */
-  GlobRef() = delete;
+  GlobRefImpl() = delete;
 
   //TODO rkowalewski: Clarify constructors by passing various pointer types
 
   /**
    * Constructor: Create an atomic reference to a element in global memory
    */
-  explicit GlobRef(dart_gptr_t dart_gptr)
+  explicit GlobRefImpl(dart_gptr_t dart_gptr)
     : _gptr(dart_gptr)
   {
-    DASH_LOG_TRACE_VAR("GlobRef(dart_gptr_t)", dart_gptr);
+    DASH_LOG_TRACE_VAR("GlobRefImpl(dart_gptr_t)", dart_gptr);
   }
 
   /**
-   * Constructor, creates an GlobRef object referencing an element in global
+   * Constructor, creates an GlobRefImpl object referencing an element in global
    * memory.
    */
   template <typename PatternT>
-  explicit GlobRef(
+  explicit GlobRefImpl(
       /// Pointer to referenced object in global memory
       const GlobPtr<const_atomic_t, PatternT>& gptr)
-    : GlobRef(gptr.dart_gptr())
+    : GlobRefImpl(gptr.dart_gptr())
   {
     static_assert(
         std::is_same<value_type, const_value_type>::value,
-        "Cannot create GlobRef<Atomic<T>> from GlobPtr<Atomic<const T>>!");
+        "Cannot create GlobRefImpl<Atomic<T>> from GlobPtr<Atomic<const T>>!");
   }
 
   template <typename PatternT>
-  explicit GlobRef(
+  explicit GlobRefImpl(
       /// Pointer to referenced object in global memory
       const GlobPtr<nonconst_atomic_t, PatternT>& gptr)
-    : GlobRef(gptr.dart_gptr())
+    : GlobRefImpl(gptr.dart_gptr())
   {
   }
 
@@ -100,8 +100,8 @@ public:
   template <
       typename _T,
       int = internal::enable_implicit_copy_ctor<value_type, _T>::value>
-  GlobRef(const GlobRef<dash::Atomic<_T>>& gref)
-    : GlobRef(gref.dart_gptr())
+  GlobRefImpl(const GlobRefImpl<dash::Atomic<_T>>& gref)
+    : GlobRefImpl(gref.dart_gptr())
   {
   }
 
@@ -114,8 +114,8 @@ public:
   template <
       typename _T,
       long = internal::enable_explicit_copy_ctor<value_type, _T>::value>
-  explicit GlobRef(const GlobRef<dash::Atomic<_T>>& gref)
-    : GlobRef(gref.dart_gptr())
+  explicit GlobRefImpl(const GlobRefImpl<dash::Atomic<_T>>& gref)
+    : GlobRefImpl(gref.dart_gptr())
   {
   }
 
@@ -130,8 +130,8 @@ public:
   template <
       typename _T,
       int = internal::enable_implicit_copy_ctor<value_type, _T>::value>
-  GlobRef(const GlobAsyncRef<dash::Atomic<_T>>& gref)
-    : GlobRef(gref.dart_gptr())
+  GlobRefImpl(const GlobAsyncRef<dash::Atomic<_T>>& gref)
+    : GlobRefImpl(gref.dart_gptr())
   {
   }
 
@@ -144,15 +144,15 @@ public:
   template <
       typename _T,
       long = internal::enable_explicit_copy_ctor<value_type, _T>::value>
-  explicit GlobRef(const GlobAsyncRef<dash::Atomic<_T>>& gref)
-    : GlobRef(gref.dart_gptr())
+  explicit GlobRefImpl(const GlobAsyncRef<dash::Atomic<_T>>& gref)
+    : GlobRefImpl(gref.dart_gptr())
   {
   }
 
   /**
    * Move Constructor.
    */
-  GlobRef(self_t&& other) = default;
+  GlobRefImpl(self_t&& other) = default;
 
   /**
    * Copy Assignment: Copies atomically the value from other
@@ -217,9 +217,9 @@ public:
         "atomic set!");
     static_assert(
         std::is_same<value_type, nonconst_value_type>::value,
-        "Cannot modify value referenced by GlobRef<Atomic<const T>>!");
-    DASH_LOG_DEBUG_VAR("GlobRef<Atomic>.store()", value);
-    DASH_LOG_TRACE_VAR("GlobRef<Atomic>.store", _gptr);
+        "Cannot modify value referenced by GlobRefImpl<Atomic<const T>>!");
+    DASH_LOG_DEBUG_VAR("GlobRefImpl<Atomic>.store()", value);
+    DASH_LOG_TRACE_VAR("GlobRefImpl<Atomic>.store", _gptr);
     dart_ret_t ret = dart_accumulate(
         _gptr,
         &value,
@@ -228,7 +228,7 @@ public:
         DART_OP_REPLACE);
     dart_flush(_gptr);
     DASH_ASSERT_EQ(DART_OK, ret, "dart_accumulate failed");
-    DASH_LOG_DEBUG("GlobRef<Atomic>.store >");
+    DASH_LOG_DEBUG("GlobRefImpl<Atomic>.store >");
   }
 
   /**
@@ -246,8 +246,8 @@ public:
         dash::dart_punned_datatype<T>::value != DART_TYPE_UNDEFINED,
         "Basic type or type smaller than 64bit required for "
         "atomic get!");
-    DASH_LOG_DEBUG("GlobRef<Atomic>.load()");
-    DASH_LOG_TRACE_VAR("GlobRef<Atomic>.load", _gptr);
+    DASH_LOG_DEBUG("GlobRefImpl<Atomic>.load()");
+    DASH_LOG_TRACE_VAR("GlobRefImpl<Atomic>.load", _gptr);
     nonconst_value_type nothing;
     nonconst_value_type result;
     dart_ret_t          ret = dart_fetch_and_op(
@@ -258,7 +258,7 @@ public:
         DART_OP_NO_OP);
     dart_flush_local(_gptr);
     DASH_ASSERT_EQ(DART_OK, ret, "dart_accumulate failed");
-    DASH_LOG_DEBUG_VAR("GlobRef<Atomic>.get >", result);
+    DASH_LOG_DEBUG_VAR("GlobRefImpl<Atomic>.get >", result);
     return result;
   }
 
@@ -290,11 +290,11 @@ public:
         "Atomic arithmetic operations only valid on basic types");
     static_assert(
         std::is_same<value_type, nonconst_value_type>::value,
-        "Cannot modify value referenced by GlobRef<Atomic<const T>>!");
-    DASH_LOG_DEBUG_VAR("GlobRef<Atomic>.op()", value);
-    DASH_LOG_TRACE_VAR("GlobRef<Atomic>.op", _gptr);
+        "Cannot modify value referenced by GlobRefImpl<Atomic<const T>>!");
+    DASH_LOG_DEBUG_VAR("GlobRefImpl<Atomic>.op()", value);
+    DASH_LOG_TRACE_VAR("GlobRefImpl<Atomic>.op", _gptr);
     nonconst_value_type acc = value;
-    DASH_LOG_TRACE("GlobRef<Atomic>.op", "dart_accumulate");
+    DASH_LOG_TRACE("GlobRefImpl<Atomic>.op", "dart_accumulate");
     dart_ret_t ret = dart_accumulate(
         _gptr,
         &acc,
@@ -303,7 +303,7 @@ public:
         binary_op.dart_operation());
     dart_flush(_gptr);
     DASH_ASSERT_EQ(DART_OK, ret, "dart_accumulate failed");
-    DASH_LOG_DEBUG_VAR("GlobRef<Atomic>.op >", acc);
+    DASH_LOG_DEBUG_VAR("GlobRefImpl<Atomic>.op >", acc);
   }
 
   /**
@@ -328,10 +328,10 @@ public:
         "Atomic arithmetic operations only valid on basic types!");
     static_assert(
         std::is_same<value_type, nonconst_value_type>::value,
-        "Cannot modify value referenced by GlobRef<Atomic<const T>>!");
-    DASH_LOG_DEBUG_VAR("GlobRef<Atomic>.fetch_op()", value);
-    DASH_LOG_TRACE_VAR("GlobRef<Atomic>.fetch_op", _gptr);
-    DASH_LOG_TRACE_VAR("GlobRef<Atomic>.fetch_op", typeid(value).name());
+        "Cannot modify value referenced by GlobRefImpl<Atomic<const T>>!");
+    DASH_LOG_DEBUG_VAR("GlobRefImpl<Atomic>.fetch_op()", value);
+    DASH_LOG_TRACE_VAR("GlobRefImpl<Atomic>.fetch_op", _gptr);
+    DASH_LOG_TRACE_VAR("GlobRefImpl<Atomic>.fetch_op", typeid(value).name());
     nonconst_value_type res;
     dart_ret_t          ret = dart_fetch_and_op(
         _gptr,
@@ -341,7 +341,7 @@ public:
         binary_op.dart_operation());
     dart_flush(_gptr);
     DASH_ASSERT_EQ(DART_OK, ret, "dart_fetch_op failed");
-    DASH_LOG_DEBUG_VAR("GlobRef<Atomic>.fetch_op >", res);
+    DASH_LOG_DEBUG_VAR("GlobRefImpl<Atomic>.fetch_op >", res);
     return res;
   }
 
@@ -372,12 +372,12 @@ public:
         "compare_exchange not available for floating point!");
     static_assert(
         std::is_same<value_type, nonconst_value_type>::value,
-        "Cannot modify value referenced by GlobRef<const T>!");
-    DASH_LOG_DEBUG_VAR("GlobRef<Atomic>.compare_exchange()", desired);
-    DASH_LOG_TRACE_VAR("GlobRef<Atomic>.compare_exchange", _gptr);
-    DASH_LOG_TRACE_VAR("GlobRef<Atomic>.compare_exchange", expected);
+        "Cannot modify value referenced by GlobRefImpl<const T>!");
+    DASH_LOG_DEBUG_VAR("GlobRefImpl<Atomic>.compare_exchange()", desired);
+    DASH_LOG_TRACE_VAR("GlobRefImpl<Atomic>.compare_exchange", _gptr);
+    DASH_LOG_TRACE_VAR("GlobRefImpl<Atomic>.compare_exchange", expected);
     DASH_LOG_TRACE_VAR(
-        "GlobRef<Atomic>.compare_exchange", typeid(desired).name());
+        "GlobRefImpl<Atomic>.compare_exchange", typeid(desired).name());
     nonconst_value_type result;
     dart_ret_t          ret = dart_compare_and_swap(
         _gptr,
@@ -388,7 +388,7 @@ public:
     dart_flush(_gptr);
     DASH_ASSERT_EQ(DART_OK, ret, "dart_compare_and_swap failed");
     DASH_LOG_DEBUG_VAR(
-        "GlobRef<Atomic>.compare_exchange >", (expected == result));
+        "GlobRefImpl<Atomic>.compare_exchange >", (expected == result));
     return (expected == result);
   }
 
@@ -400,7 +400,7 @@ public:
   {
     static_assert(
         std::is_same<value_type, nonconst_value_type>::value,
-        "Cannot modify value referenced by GlobRef<const T>!");
+        "Cannot modify value referenced by GlobRefImpl<const T>!");
     op(dash::plus<T>(), value);
   }
 
@@ -548,6 +548,83 @@ public:
   }
 };
 
+template <class T>
+class GlobRef<dash::Atomic<T>> : public TracedReference<GlobRefImpl<dash::Atomic<T>>> {
+public:
+
+	using const_type = typename GlobRefImpl<dash::Atomic<T>>::const_type;
+
+	GlobRef (dart_gptr_t dart_gptr) :
+		TracedReference<GlobRefImpl<dash::Atomic<T>>>(dart_gptr)
+	{}
+
+	template <class PatternT>
+	operator GlobPtr<T, PatternT> () const {
+		this->traced_call(&GlobRefImpl<T>::operator GlobPtr<T, PatternT>);
+	}
+
+	dart_gptr_t dart_gptr () const {
+		return this->traced_call(&GlobRefImpl<dash::Atomic<T>>::dart_gptr);
+	}
+
+	bool is_local () const {
+		return this->traced_call(&GlobRefImpl<T>::dart_gptr);
+	}
+
+	T get () const {
+		return this->traced_call(static_cast<T (GlobRefImpl<dash::Atomic<T>>::*)() const>(&GlobRefImpl<dash::Atomic<T>>::get));
+	}
+
+	void get (T *tptr) const {
+		this->traced_call(static_cast<void (GlobRefImpl<dash::Atomic<T>>::*)(T *tptr) const>(&GlobRefImpl<dash::Atomic<T>>::get), tptr);
+	}
+
+	void get (T &tref) const {
+		this->traced_call(static_cast<void (GlobRefImpl<dash::Atomic<T>>::*)(T &tptr) const>(&GlobRefImpl<dash::Atomic<T>>::get), tref);
+	}
+
+	void put (T &tref) const {
+		this->traced_call(static_cast<void (GlobRefImpl<dash::Atomic<T>>::*)(T &tptr) const>(&GlobRefImpl<dash::Atomic<T>>::put), tref);
+	}
+
+	void put (T *tptr) const {
+		this->traced_call(static_cast<void (GlobRefImpl<dash::Atomic<T>>::*)(T *tptr) const>(&GlobRefImpl<dash::Atomic<T>>::put), tptr);
+	}
+
+	void add(const T& value) const {
+		this->traced_call(&GlobRefImpl<dash::Atomic<T>>::add, value);
+	}
+
+	T fetch_add(const T& value) const {
+		return this->traced_call(&GlobRefImpl<dash::Atomic<T>>::fetch_add, value);
+	}
+
+	void sub(const T& value) const {
+		this->traced_call(&GlobRefImpl<dash::Atomic<T>>::sub, value);
+	}
+
+	T fetch_sub(const T& value) const {
+		return this->traced_call(&GlobRefImpl<dash::Atomic<T>>::fetch_sub, value);
+	}
+
+	void multiply(const T& value) const {
+		this->traced_call(&GlobRefImpl<dash::Atomic<T>>::multiply, value);
+	}
+
+	T fetch_multiply(const T& value) const {
+		return this->traced_call(&GlobRefImpl<dash::Atomic<T>>::fetch_multiply, value);
+	}
+
+	T load() const {
+		return this->traced_call(&GlobRefImpl<dash::Atomic<T>>::load);
+	}
+	// GlobRef< MEMTYPE > 	member (size_t offs) const
+	// GlobRef< MEMTYPE > 	member (const MEMTYPE P::*mem) const
+
+// 	friend std::ostream& operator<<(std::ostream &os, const GlobRef< U > &gref);
+// 	friend void swap (GlobRef< T > a, GlobRef< T > b);
+}; // End of class GlobRef
+
 }  // namespace dash
 
-#endif  // DASH__ATOMIC_GLOBREF_H_
+#endif  // DASH__ATOMIC_GlobRefImpl_H_

@@ -13,7 +13,7 @@ namespace dash {
 
 // Forward declarations
 template <class T>
-class GlobRef;
+class GlobRefImpl;
 
 /**
  * Global value reference for asynchronous / non-blocking operations.

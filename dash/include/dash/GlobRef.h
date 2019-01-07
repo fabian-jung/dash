@@ -1,9 +1,10 @@
-#ifndef DASH__GLOBREF_H_
-#define DASH__GLOBREF_H_
+#ifndef DASH__GlobRef_H_
+#define DASH__GlobRef_H_
 
 #include <dash/GlobPtr.h>
 #include <dash/Onesided.h>
 #include <dash/iterator/internal/GlobRefBase.h>
+#include <dash/profiling/TracedReference.h>
 
 namespace dash {
 
@@ -15,22 +16,22 @@ class GlobAsyncRef;
 template<typename T, class MemSpaceT> class GlobPtr;
 
 template<typename T>
-class GlobRef
+class GlobRefImpl
 {
   template<typename U>
   friend std::ostream & operator<<(
     std::ostream & os,
-    const GlobRef<U> & gref);
+    const GlobRefImpl<U> & gref);
 
   template <typename ElementT>
-  friend class GlobRef;
+  friend class GlobRefImpl;
 
 public:
   using value_type          = T;
   using const_value_type    = typename std::add_const<T>::type;
   using nonconst_value_type = typename std::remove_const<T>::type;
-  using self_t              = GlobRef<T>;
-  using const_type          = GlobRef<const_value_type>;
+  using self_t              = GlobRefImpl<T>;
+  using const_type          = GlobRefImpl<const_value_type>;
 
 
   template <class _T, class _M>
@@ -44,29 +45,29 @@ public:
 
 private:
   /**
-   * PRIVATE: Constructor, creates an GlobRef object referencing an element in global
+   * PRIVATE: Constructor, creates an GlobRefImplImpl object referencing an element in global
    * memory.
    */
   template<class ElementT, class MemSpaceT>
-  explicit constexpr GlobRef(
+  explicit constexpr GlobRefImpl(
     /// Pointer to referenced object in global memory
     const GlobPtr<ElementT, MemSpaceT> & gptr)
-  : GlobRef(gptr.dart_gptr())
+  : GlobRefImpl(gptr.dart_gptr())
   { }
 
 public:
   /**
    * Reference semantics forbid declaration without definition.
    */
-  GlobRef() = delete;
+  GlobRefImpl() = delete;
 
-  GlobRef(const GlobRef & other) = delete;
+  GlobRefImpl(const GlobRefImpl & other) = delete;
 
   /**
-   * Constructor, creates an GlobRef object referencing an element in global
+   * Constructor, creates an GlobRefImpl object referencing an element in global
    * memory.
    */
-  explicit constexpr GlobRef(dart_gptr_t dart_gptr)
+  explicit constexpr GlobRefImpl(dart_gptr_t dart_gptr)
   : _gptr(dart_gptr)
   {
   }
@@ -82,8 +83,8 @@ public:
   template <
       typename _T,
       long = internal::enable_implicit_copy_ctor<value_type, _T>::value>
-  constexpr GlobRef(const GlobRef<_T>& gref)
-    : GlobRef(gref.dart_gptr())
+  constexpr GlobRefImpl(const GlobRefImpl<_T>& gref)
+    : GlobRefImpl(gref.dart_gptr())
   {
   }
 
@@ -96,19 +97,19 @@ public:
   template <
       typename _T,
       int = internal::enable_explicit_copy_ctor<value_type, _T>::value>
-  explicit constexpr GlobRef(const GlobRef<_T>& gref)
-    : GlobRef(gref.dart_gptr())
+  explicit constexpr GlobRefImpl(const GlobRefImpl<_T>& gref)
+    : GlobRefImpl(gref.dart_gptr())
   {
   }
 
   /**
-   * Constructor to convert \c GlobAsyncRef to GlobRef. Set to explicit to
+   * Constructor to convert \c GlobAsyncRef to GlobRefImpl. Set to explicit to
    * avoid unintendet conversion
    */
   template <
       typename _T,
       long = internal::enable_implicit_copy_ctor<value_type, _T>::value>
-  constexpr GlobRef(const GlobAsyncRef<_T>& gref)
+  constexpr GlobRefImpl(const GlobAsyncRef<_T>& gref)
     : _gptr(gref.dart_gptr())
   {
   }
@@ -116,18 +117,18 @@ public:
   template <
       typename _T,
       int = internal::enable_explicit_copy_ctor<value_type, _T>::value>
-  explicit constexpr GlobRef(const GlobAsyncRef<_T>& gref)
-    : GlobRef(gref.dart_gptr())
+  explicit constexpr GlobRefImpl(const GlobAsyncRef<_T>& gref)
+    : GlobRefImpl(gref.dart_gptr())
   {
   }
 
   /**
    * Move Constructor
    */
-  GlobRef(self_t&& other)
+  GlobRefImpl(self_t&& other)
     :_gptr(std::move(other._gptr))
   {
-    DASH_LOG_TRACE("GlobRef.GlobRef(GlobRef &&)", _gptr);
+    DASH_LOG_TRACE("GlobRefImpl.GlobRefImpl(GlobRefImpl &&)", _gptr);
   }
 
   /**
@@ -146,7 +147,7 @@ public:
    * Move Assignment: Redirects to Copy Assignment
    */
   self_t& operator=(self_t&& other) {
-    DASH_LOG_TRACE("GlobRef.operator=(GlobRef &&)", _gptr);
+    DASH_LOG_TRACE("GlobRefImpl.operator=(GlobRefImpl &&)", _gptr);
     operator=(other);
     return *this;
   }
@@ -161,22 +162,22 @@ public:
 
 
   operator nonconst_value_type() const {
-    DASH_LOG_TRACE("GlobRef.T()", "conversion operator");
-    DASH_LOG_TRACE_VAR("GlobRef.T()", _gptr);
+    DASH_LOG_TRACE("GlobRefImpl.T()", "conversion operator");
+    DASH_LOG_TRACE_VAR("GlobRefImpl.T()", _gptr);
     nonconst_value_type t;
     dash::internal::get_blocking(_gptr, &t, 1);
-    DASH_LOG_TRACE_VAR("GlobRef.T >", _gptr);
+    DASH_LOG_TRACE_VAR("GlobRefImpl.T >", _gptr);
     return t;
   }
 
   template <typename ValueT>
-  bool operator==(const GlobRef<ValueT> & other) const {
+  bool operator==(const GlobRefImpl<ValueT> & other) const {
     ValueT val = other.get();
     return operator==(val);
   }
 
   template <typename ValueT>
-  bool operator!=(const GlobRef<ValueT> & other) const {
+  bool operator!=(const GlobRefImpl<ValueT> & other) const {
     return !(*this == other);
   }
 
@@ -195,58 +196,58 @@ public:
   void
   set(const value_type & val) const {
     static_assert(std::is_same<value_type, nonconst_value_type>::value,
-                  "Cannot modify value referenced by GlobRef<const T>!");
+                  "Cannot modify value referenced by GlobRefImpl<const T>!");
 
-    DASH_LOG_TRACE_VAR("GlobRef.set()", val);
-    DASH_LOG_TRACE_VAR("GlobRef.set", _gptr);
+    DASH_LOG_TRACE_VAR("GlobRefImpl.set()", val);
+    DASH_LOG_TRACE_VAR("GlobRefImpl.set", _gptr);
     // TODO: Clarify if dart-call can be avoided if
     //       _gptr->is_local()
     dash::internal::put_blocking(_gptr, &val, 1);
-    DASH_LOG_TRACE_VAR("GlobRef.set >", _gptr);
+    DASH_LOG_TRACE_VAR("GlobRefImpl.set >", _gptr);
   }
 
   nonconst_value_type get() const {
-    DASH_LOG_TRACE("T GlobRef.get()", "explicit get");
-    DASH_LOG_TRACE_VAR("GlobRef.T()", _gptr);
+    DASH_LOG_TRACE("T GlobRefImpl.get()", "explicit get");
+    DASH_LOG_TRACE_VAR("GlobRefImpl.T()", _gptr);
     nonconst_value_type t;
     dash::internal::get_blocking(_gptr, &t, 1);
     return t;
   }
 
   void get(nonconst_value_type *tptr) const {
-    DASH_LOG_TRACE("GlobRef.get(T*)", "explicit get into provided ptr");
-    DASH_LOG_TRACE_VAR("GlobRef.T()", _gptr);
+    DASH_LOG_TRACE("GlobRefImpl.get(T*)", "explicit get into provided ptr");
+    DASH_LOG_TRACE_VAR("GlobRefImpl.T()", _gptr);
     dash::internal::get_blocking(_gptr, tptr, 1);
   }
 
   void get(nonconst_value_type& tref) const {
-    DASH_LOG_TRACE("GlobRef.get(T&)", "explicit get into provided ref");
-    DASH_LOG_TRACE_VAR("GlobRef.T()", _gptr);
+    DASH_LOG_TRACE("GlobRefImpl.get(T&)", "explicit get into provided ref");
+    DASH_LOG_TRACE_VAR("GlobRefImpl.T()", _gptr);
     dash::internal::get_blocking(_gptr, &tref, 1);
   }
 
   void
   put(const_value_type& tref) const {
     static_assert(std::is_same<value_type, nonconst_value_type>::value,
-                  "Cannot assign to GlobRef<const T>!");
-    DASH_LOG_TRACE("GlobRef.put(T&)", "explicit put of provided ref");
-    DASH_LOG_TRACE_VAR("GlobRef.T()", _gptr);
+                  "Cannot assign to GlobRefImpl<const T>!");
+    DASH_LOG_TRACE("GlobRefImpl.put(T&)", "explicit put of provided ref");
+    DASH_LOG_TRACE_VAR("GlobRefImpl.T()", _gptr);
     dash::internal::put_blocking(_gptr, &tref, 1);
   }
 
   void
   put(const_value_type* tptr) const {
     static_assert(std::is_same<value_type, nonconst_value_type>::value,
-                  "Cannot modify value referenced by GlobRef<const T>!");
-    DASH_LOG_TRACE("GlobRef.put(T*)", "explicit put of provided ptr");
-    DASH_LOG_TRACE_VAR("GlobRef.T()", _gptr);
+                  "Cannot modify value referenced by GlobRefImpl<const T>!");
+    DASH_LOG_TRACE("GlobRefImpl.put(T*)", "explicit put of provided ptr");
+    DASH_LOG_TRACE_VAR("GlobRefImpl.T()", _gptr);
     dash::internal::put_blocking(_gptr, tptr, 1);
   }
 
   const self_t &
   operator+=(const nonconst_value_type& ref) const {
     static_assert(std::is_same<value_type, nonconst_value_type>::value,
-                  "Cannot modify value referenced by GlobRef<const T>!");
+                  "Cannot modify value referenced by GlobRefImpl<const T>!");
 #if 0
     // TODO: Alternative implementation, possibly more efficient:
     T add_val = ref;
@@ -270,7 +271,7 @@ public:
   const self_t &
   operator-=(const nonconst_value_type& ref) const {
     static_assert(std::is_same<value_type, nonconst_value_type>::value,
-                  "Cannot modify value referenced by GlobRef<const T>!");
+                  "Cannot modify value referenced by GlobRefImpl<const T>!");
     nonconst_value_type val  = operator nonconst_value_type();
     val   -= ref;
     operator=(val);
@@ -280,7 +281,7 @@ public:
   const self_t &
   operator++() const {
     static_assert(std::is_same<value_type, nonconst_value_type>::value,
-                  "Cannot modify value referenced by GlobRef<const T>!");
+                  "Cannot modify value referenced by GlobRefImpl<const T>!");
     nonconst_value_type val = operator nonconst_value_type();
     operator=(++val);
     return *this;
@@ -289,7 +290,7 @@ public:
   nonconst_value_type
   operator++(int) const {
     static_assert(std::is_same<value_type, nonconst_value_type>::value,
-                  "Cannot modify value referenced by GlobRef<const T>!");
+                  "Cannot modify value referenced by GlobRefImpl<const T>!");
     nonconst_value_type val = operator nonconst_value_type();
     nonconst_value_type res = val++;
     operator=(val);
@@ -299,7 +300,7 @@ public:
   const self_t &
   operator--() const {
     static_assert(std::is_same<value_type, nonconst_value_type>::value,
-                  "Cannot modify value referenced by GlobRef<const T>!");
+                  "Cannot modify value referenced by GlobRefImpl<const T>!");
     nonconst_value_type val = operator nonconst_value_type();
     operator=(--val);
     return *this;
@@ -308,7 +309,7 @@ public:
   nonconst_value_type
   operator--(int) const {
     static_assert(std::is_same<value_type, nonconst_value_type>::value,
-                  "Cannot modify value referenced by GlobRef<const T>!");
+                  "Cannot modify value referenced by GlobRefImpl<const T>!");
     nonconst_value_type val = operator nonconst_value_type();
     nonconst_value_type res = val--;
     operator=(val);
@@ -318,7 +319,7 @@ public:
   const self_t &
   operator*=(const_value_type& ref) const {
     static_assert(std::is_same<value_type, nonconst_value_type>::value,
-                  "Cannot modify value referenced by GlobRef<const T>!");
+                  "Cannot modify value referenced by GlobRefImpl<const T>!");
     nonconst_value_type val = operator nonconst_value_type();
     val   *= ref;
     operator=(val);
@@ -328,7 +329,7 @@ public:
   const self_t &
   operator/=(const_value_type& ref) const {
     static_assert(std::is_same<value_type, nonconst_value_type>::value,
-                  "Cannot modify value referenced by GlobRef<const T>!");
+                  "Cannot modify value referenced by GlobRefImpl<const T>!");
     nonconst_value_type val = operator nonconst_value_type();
     val   /= ref;
     operator=(val);
@@ -338,7 +339,7 @@ public:
   const self_t &
   operator^=(const_value_type& ref) const {
     static_assert(std::is_same<value_type, nonconst_value_type>::value,
-                  "Cannot modify value referenced by GlobRef<const T>!");
+                  "Cannot modify value referenced by GlobRefImpl<const T>!");
     nonconst_value_type val = operator nonconst_value_type();
     val   ^= ref;
     operator=(val);
@@ -364,20 +365,20 @@ public:
    * specified offset
    */
   template<typename MEMTYPE>
-  GlobRef<typename internal::add_const_from_type<T, MEMTYPE>::type>
+  GlobRefImpl<typename internal::add_const_from_type<T, MEMTYPE>::type>
   member(size_t offs) const {
     dart_gptr_t dartptr = _gptr;
     DASH_ASSERT_RETURNS(
       dart_gptr_incaddr(&dartptr, offs),
       DART_OK);
-    return GlobRef<typename internal::add_const_from_type<T, MEMTYPE>::type>(dartptr);
+    return GlobRefImpl<typename internal::add_const_from_type<T, MEMTYPE>::type>(dartptr);
   }
 
   /**
    * Get the member via pointer to member
    */
   template<class MEMTYPE, class P=T>
-  GlobRef<typename internal::add_const_from_type<T, MEMTYPE>::type>
+  GlobRefImpl<typename internal::add_const_from_type<T, MEMTYPE>::type>
   member(
     const MEMTYPE P::*mem) const {
     // TODO: Thaaaat ... looks hacky.
@@ -388,9 +389,9 @@ public:
   /**
    * specialization which swappes the values of two global references
    */
-  inline void swap(dash::GlobRef<T> & b) const{
+  inline void swap(dash::GlobRefImpl<T> & b) const{
     static_assert(std::is_same<value_type, nonconst_value_type>::value,
-                  "Cannot modify value referenced by GlobRef<const T>!");
+                  "Cannot modify value referenced by GlobRefImpl<const T>!");
     auto tmp = static_cast<T>(*this);
     *this = b;
     b = tmp;
@@ -403,7 +404,7 @@ private:
 template<typename T>
 std::ostream & operator<<(
   std::ostream     & os,
-  const GlobRef<T> & gref)
+  const GlobRefImpl<T> & gref)
 {
   char buf[100]; //
   sprintf(buf,
@@ -421,7 +422,7 @@ std::ostream & operator<<(
  * specialization for unqualified calls to swap
  */
 template<typename T>
-inline void swap(dash::GlobRef<T> && a, dash::GlobRef<T> && b){
+inline void swap(dash::GlobRefImpl<T> && a, dash::GlobRefImpl<T> && b){
   a.swap(b);
 }
 
@@ -429,11 +430,67 @@ inline void swap(dash::GlobRef<T> && a, dash::GlobRef<T> && b){
  * specialization for unqualified calls to swap
  */
 template <class MemSpaceT, class T>
-inline auto addressof(dash::GlobRef<T> const & ref)
+inline auto addressof(dash::GlobRefImpl<T> const & ref)
 {
   return dash::GlobPtr<T, MemSpaceT>(ref.dart_gptr());
 }
 
+template <class T>
+class GlobRef : public TracedReference<GlobRefImpl<T>> {
+public:
+
+	using const_type = typename GlobRefImpl<T>::const_type;
+	using value_type = typename GlobRefImpl<T>::value_type;
+
+	GlobRef (dart_gptr_t dart_gptr) :
+		TracedReference<GlobRefImpl<T>>(dart_gptr)
+	{}
+
+	template <class PatternT>
+	operator GlobPtr<T, PatternT> () const {
+		this->traced_call(&GlobRefImpl<T>::operator GlobPtr<T, PatternT>);
+	}
+
+	GlobRef& operator=(const value_type value) {
+		this->TracedReference<GlobRefImpl<T>>::operator=(value);
+		return *this;
+	}
+
+	dart_gptr_t dart_gptr () const {
+		return this->traced_call(&GlobRefImpl<T>::dart_gptr);
+	}
+
+	bool is_local () const {
+		return this->traced_call(&GlobRefImpl<T>::dart_gptr);
+	}
+
+	T get () const {
+		return this->traced_call(static_cast<T (GlobRefImpl<T>::*)() const>(&GlobRefImpl<T>::get));
+	}
+
+	void get (T *tptr) const {
+		this->traced_call(static_cast<void (GlobRefImpl<T>::*)(T *tptr) const>(&GlobRefImpl<T>::get), tptr);
+	}
+
+	void get (T &tref) const {
+		this->traced_call(static_cast<void (GlobRefImpl<T>::*)(T &tptr) const>(&GlobRefImpl<T>::get), tref);
+	}
+
+	void put (T &tref) const {
+		this->traced_call(static_cast<void (GlobRefImpl<T>::*)(T &tptr) const>(&GlobRefImpl<T>::put), tref);
+	}
+
+	void put (T *tptr) const {
+		this->traced_call(static_cast<void (GlobRefImpl<T>::*)(T *tptr) const>(&GlobRefImpl<T>::put), tptr);
+	}
+
+	// GlobRef< MEMTYPE > 	member (size_t offs) const
+	// GlobRef< MEMTYPE > 	member (const MEMTYPE P::*mem) const
+
+// 	friend std::ostream& operator<<(std::ostream &os, const GlobRef< U > &gref);
+// 	friend void swap (GlobRef< T > a, GlobRef< T > b);
+	};
+
 } // namespace dash
 
-#endif // DASH__GLOBREF_H_
+#endif // DASH__GlobRefImpl_H_

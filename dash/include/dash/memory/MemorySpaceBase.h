@@ -20,7 +20,7 @@ namespace dash {
 /// Forward declarations
 
 template <typename ElementType, class MemorySpace>
-class GlobPtrImpl;
+class GlobPtr;
 
 /**
  * The \c MemorySpace concept follows the STL \c std::pmr::memory_resource.
@@ -164,7 +164,7 @@ template <class _Ms>
 struct memspace_traits_void_pointer_type<_Ms, false> {
   typedef typename std::conditional<
       memspace_traits_is_global<_Ms>::value,
-      dash::GlobPtrImpl<void, _Ms>,
+      dash::GlobPtr<void, _Ms>,
       void*>::type type;
 };
 
@@ -177,7 +177,7 @@ template <class _Ms>
 struct memspace_traits_const_void_pointer_type<_Ms, false> {
   typedef typename std::conditional<
       memspace_traits_is_global<_Ms>::value,
-      dash::GlobPtrImpl<const void, _Ms>,
+      dash::GlobPtr<const void, _Ms>,
       const void*>::type type;
 };
 

@@ -15,7 +15,7 @@ template<typename T>
 class Atomic;
 
 template<class T>
-class GlobRef;
+class GlobRefImpl;
 
 /**
  * Specialization for atomic values. All atomic operations are
