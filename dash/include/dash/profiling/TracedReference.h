@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits>
+#include <dash/profiling/Profiler.h>
 
 namespace dash {
 
@@ -51,7 +52,8 @@ public:
 	{}
 
 	operator value_type() const {
-		std::cout << "converted GlobRef" << std::endl;
+		profiler.trackRead(ref);
+		std::cout << "TracedRef: converted GlobRef" << std::endl;
 		return static_cast<value_type>(ref);
 	}
 
@@ -72,61 +74,73 @@ public:
 	}
 
 	TracedReference& operator= (const value_type val) {
-		std::cout << "Traced Ref Assignment" << std::endl;
+		std::cout << "TracedReference: Traced Ref Assignment" << std::endl;
+		profiler.trackWrite(ref);
 		ref.operator=(val);
 		return *this;
 	}
 
 	TracedReference& operator+= (const value_type &ref) {
+		profiler.trackWrite(ref);
 		return this->ref += ref;
 	}
 
 	TracedReference& operator-= (const value_type &ref)  {
+		profiler.trackWrite(ref);
 		return this->ref -= ref;
 	}
 
 	TracedReference& operator++ ()  {
+		profiler.trackWrite(ref);
 		return ++ref;
 	}
 
 	TracedReference	operator++ (int) {
+		profiler.trackWrite(ref);
 		return ref++;
 	}
 
 	TracedReference& operator-- () {
+		profiler.trackWrite(ref);
 		return --ref;
 	}
 
 	TracedReference	operator-- (int) {
+		profiler.trackWrite(ref);
 		return ref--;
 	}
 
 	TracedReference& operator*= (const value_type &ref)  {
+		profiler.trackWrite(ref);
 		return this->ref *= ref;
 	}
 
 	TracedReference& operator/= (const value_type &ref)  {
+		profiler.trackWrite(ref);
 		return this->ref /= ref;
 	}
 
 	TracedReference& operator^= (const value_type &ref)  {
+		profiler.trackWrite(ref);
 		return this->ref ^= ref;
 	}
 
 	template <class fptr_t, class... Args>
 	auto traced_call(fptr_t f, Args&&... args) {
-		std::cout << "Traced Ref Call" << std::endl;
+// 		profiler.track(ref, f);
+		std::cout << "TracedReference: Traced Ref Call" << std::endl;
 		return (ref.*f)(std::forward<Args>(args)...);
 	}
 
 	template <class fptr_t, class... Args>
 	auto traced_call(fptr_t f, Args&&... args) const {
-		std::cout << "Traced Ref Call" << std::endl;
+// 		profiler.track(ref, f);
 		return (ref.*f)(std::forward<Args>(args)...);
 	}
 
 private:
 	reference ref;
+	Profiler& profiler = Profiler::get();
 }; // End of class TracedReference
 
 } // End of namespace dash

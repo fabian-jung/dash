@@ -2,6 +2,7 @@
 
 #include <type_traits>
 #include <dash/meta/ConditionalType.h>
+#include <dash/profiling/Profiler.h>
 
 namespace dash {
 
@@ -197,7 +198,6 @@ public:
 
 	reference operator*() { // Indirection
 		std::cout << "indirection" << std::endl;
-		profiler.track();
 		return *ptr;
 	}
 
@@ -237,6 +237,7 @@ public:
 
 private:
 	pointer ptr;
+	Profiler& profiler = Profiler::get();
 
 	template <class T2>
 	friend class TracedPointer;

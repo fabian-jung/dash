@@ -15,6 +15,11 @@ int main(int argc, char* argv[]) {
 		arr[i] = i;
 	}
 
+	for(auto i = 0; i < size; ++i) {
+		arr[i] == 0;
+	}
+
+
 	arr.barrier();
 
 	dash::finalize();
