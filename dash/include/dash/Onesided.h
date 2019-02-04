@@ -4,7 +4,7 @@
 #include <dash/Team.h>
 
 #include <dash/dart/if/dart.h>
-
+#include <dash/profiling/Profiler.h>
 
 namespace dash {
 
@@ -20,6 +20,7 @@ namespace internal {
   inline
   void
   put(const dart_gptr_t& gptr, const T *src, size_t nelem) {
+    Profiler::get().trackOnesidedPut(sizeof(T)*nelem, gptr.unitid);
     dash::dart_storage<T> ds(nelem);
     DASH_ASSERT_RETURNS(
       dart_put(gptr,
@@ -40,6 +41,7 @@ namespace internal {
   inline
   void
   get(const dart_gptr_t& gptr, T *dst, size_t nelem) {
+    Profiler::get().trackOnesidedGet(sizeof(T)*nelem, gptr.unitid);
     dash::dart_storage<T> ds(nelem);
     DASH_ASSERT_RETURNS(
       dart_get(dst,
@@ -60,6 +62,7 @@ namespace internal {
   inline
   void
   put_blocking(const dart_gptr_t& gptr, const T *src, size_t nelem) {
+    Profiler::get().trackOnesidedPut(sizeof(T)*nelem, gptr.unitid);
     dash::dart_storage<T> ds(nelem);
     DASH_ASSERT_RETURNS(
       dart_put_blocking(gptr,
@@ -80,6 +83,7 @@ namespace internal {
   inline
   void
   get_blocking(const dart_gptr_t& gptr, T *dst, size_t nelem) {
+    Profiler::get().trackOnesidedGet(sizeof(T)*nelem, gptr.unitid);
     dash::dart_storage<T> ds(nelem);
     DASH_ASSERT_RETURNS(
       dart_get_blocking(dst,
@@ -105,6 +109,7 @@ namespace internal {
     const T           * src,
     size_t              nelem,
     dart_handle_t     * handle) {
+    Profiler::get().trackOnesidedPut(sizeof(T)*nelem, gptr.unitid);
     dash::dart_storage<T> ds(nelem);
     DASH_ASSERT_RETURNS(
       dart_put_handle(gptr,
@@ -131,6 +136,7 @@ namespace internal {
     T                 * dst,
     size_t              nelem,
     dart_handle_t     * handle) {
+    Profiler::get().trackOnesidedGet(sizeof(T)*nelem, gptr.unitid);
     dash::dart_storage<T> ds(nelem);
     DASH_ASSERT_RETURNS(
       dart_get_handle(dst,
@@ -183,6 +189,7 @@ void put_value_async(
   /// [IN]  Global pointer referencing target address of value
   const GlobPtrType & gptr)
 {
+  Profiler::get().trackOnesidedPut(sizeof(T), gptr.unitid);
   dash::internal::put(gptr.dart_gptr(), &newval, 1);
 }
 
@@ -201,6 +208,7 @@ void get_value_async(
   /// [IN]  Global pointer to read
   const GlobPtrType & gptr)
 {
+  Profiler::get().trackOnesidedGet(sizeof(T), gptr.unitid);
   dash::internal::get(gptr.dart_gptr(), ptr, 1);
 }
 
@@ -217,6 +225,7 @@ void put_value(
   /// [IN]  Global pointer referencing target address of value
   const GlobPtrType & gptr)
 {
+  Profiler::get().trackOnesidedPut(sizeof(T), gptr.unitid);
   dash::internal::put_blocking(gptr.dart_gptr(), &newval, 1);
 }
 
@@ -234,6 +243,7 @@ void get_value(
   /// [IN]  Global pointer to read
   const GlobPtrType & gptr)
 {
+  Profiler::get().trackOnesidedGet(sizeof(T), gptr.unitid);
   dash::internal::get_blocking(gptr.dart_gptr(), ptr, 1);
 }
 

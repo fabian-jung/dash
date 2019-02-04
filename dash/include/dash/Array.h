@@ -17,6 +17,8 @@
 #include <dash/memory/UniquePtr.h>
 #include <dash/pattern/BlockPattern1D.h>
 
+#include <dash/profiling/TracedPointer.h>
+
 #include <iterator>
 #include <initializer_list>
 #include <type_traits>
@@ -131,11 +133,11 @@ public:
   typedef       T &                                           reference;
   typedef const T &                                     const_reference;
 
-  typedef       T *                                             pointer;
-  typedef const T *                                       const_pointer;
+  typedef       TracedPointer<T>                                pointer;
+  typedef		TracedPointer<const T>                    const_pointer;
 
-  typedef       T *                                            iterator;
-  typedef const T *                                      const_iterator;
+  typedef       TracedPointer<T>                               iterator;
+  typedef       TracedPointer<const T>                   const_iterator;
 
 public:
   /// Type alias for LocalArrayRef<T,I,P>::view_type
@@ -558,9 +560,9 @@ public:
   /// View representing elements in the active unit's local memory.
   inline    local_type          sub_local()              noexcept;
   /// Pointer to first element in local range.
-  constexpr ElementType       * lbegin()           const noexcept;
+  constexpr TracedPointer<ElementType>    lbegin()           const noexcept;
   /// Pointer past final element in local range.
-  constexpr ElementType       * lend()             const noexcept;
+  constexpr TracedPointer<ElementType>    lend()             const noexcept;
 
   reference operator[](
     /// The position of the element to return

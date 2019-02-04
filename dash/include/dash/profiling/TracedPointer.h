@@ -3,12 +3,9 @@
 #include <type_traits>
 #include <dash/meta/ConditionalType.h>
 #include <dash/profiling/Profiler.h>
+#include <dash/profiling/traits.h>
 
 namespace dash {
-
-struct profiling_enabled {
-	constexpr static bool value = true;
-};
 
 template <class type>
 class TracedPointer {
@@ -68,7 +65,7 @@ public:
 	TracedPointer(pointer conv) noexcept :
 		ptr(conv)
 	{
-		std::cout << "TracedPointer" << std::endl;
+// 		std::cout << "TracedPointer" << std::endl;
 	}
 
 	TracedPointer& operator=(pointer conv) noexcept {
@@ -193,11 +190,13 @@ public:
 	template <class numerical_t>
 	reference operator[](numerical_t rhs) {//Subscript
 		std::cout << "subscript" << std::endl;
+		Profiler::get().trackDeref(ptr);
 		return ptr[rhs];
 	}
 
 	reference operator*() { // Indirection
 		std::cout << "indirection" << std::endl;
+		Profiler::get().trackDeref(ptr);
 		return *ptr;
 	}
 
@@ -206,12 +205,14 @@ public:
 	}
 
 	pointer operator->() {
+		Profiler::get().trackDeref(ptr);
 		return ptr;
 	}
 
 	template <class member_pointer_t>
 	reference operator->*(member_pointer_t member_pointer) {
 		std::cout << "member_pointer" << std::endl;
+		Profiler::get().trackDeref(ptr);
 		return ptr->*member_pointer;
 	}
 

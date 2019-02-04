@@ -614,7 +614,7 @@ public:
 		TracedPointer<GlobPtrImpl<T, MemSpaceT>>(conv)
 	{}
 
-	GlobPtr(dart_gptr_t& gptr) :
+	GlobPtr(const dart_gptr_t& gptr) :
 		TracedPointer<GlobPtrImpl<T, MemSpaceT>>(GlobPtrImpl<T, MemSpaceT>(gptr))
 	{}
 

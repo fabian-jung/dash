@@ -53,7 +53,7 @@ public:
 
 	operator value_type() const {
 		profiler.trackRead(ref);
-		std::cout << "TracedRef: converted GlobRef" << std::endl;
+// 		std::cout << "TracedRef: converted GlobRef" << std::endl;
 		return static_cast<value_type>(ref);
 	}
 
@@ -81,13 +81,15 @@ public:
 	}
 
 	TracedReference& operator+= (const value_type &ref) {
-		profiler.trackWrite(ref);
-		return this->ref += ref;
+		profiler.trackWrite(this->ref);
+		this->ref += ref;
+		return *this;
 	}
 
 	TracedReference& operator-= (const value_type &ref)  {
-		profiler.trackWrite(ref);
-		return this->ref -= ref;
+		profiler.trackWrite(this->ref);
+		this->ref -= ref;
+		return *this;
 	}
 
 	TracedReference& operator++ ()  {
@@ -111,18 +113,21 @@ public:
 	}
 
 	TracedReference& operator*= (const value_type &ref)  {
-		profiler.trackWrite(ref);
-		return this->ref *= ref;
+		profiler.trackWrite(this->ref);
+		this->ref *= ref;
+		return *this;
 	}
 
 	TracedReference& operator/= (const value_type &ref)  {
-		profiler.trackWrite(ref);
-		return this->ref /= ref;
+		profiler.trackWrite(this->ref);
+		this->ref /= ref;
+		return *this;
 	}
 
 	TracedReference& operator^= (const value_type &ref)  {
-		profiler.trackWrite(ref);
-		return this->ref ^= ref;
+		profiler.trackWrite(this->ref);
+		this->ref ^= ref;
+		return *this;
 	}
 
 	template <class fptr_t, class... Args>
