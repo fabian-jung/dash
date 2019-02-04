@@ -78,31 +78,39 @@ public:
 		++counter(counter_t::GLOB_REF_WRITE, uid);
 	}
 
+	template <class T>
+	void trackDeref(const T* ptr) {
+		// Native/local Ptr deref
+		++counter(counter_t::LOC_PTR_DEREF, myid);
+	}
+
 	void report(std::string stage) {
 		std::stringstream s;
 		s << "Profiler overview for stage [" << stage << "] and unit " << myid << ":\n";
 		s << "GlobPtr Operations:\n";
-		s << "Dereference Operations:\n";
+		s << "	Dereference Operations:\n";
 		for(size_t i = 0; i < size; ++i) {
-			s << "[" << (i!=myid ? std::to_string(i) : "S")  << "]: " << counter(counter_t::GLOB_PTR_DEREF, i) << "\n";
+			s << "		[" << (i!=myid ? std::to_string(i) : "S")  << "]: " << counter(counter_t::GLOB_PTR_DEREF, i) << "\n";
 		}
+		s << "Local Pointer Operations:\n";
+		s << "	Dereference Operations: " << counter(counter_t::LOC_PTR_DEREF, myid) << "\n";
 		s << "GlobRef Operations:\n";
-		s << "Reads:\n";
+		s << "	Reads:\n";
 		for(size_t i = 0; i < size; ++i) {
-			s << "[" << (i!=myid ? std::to_string(i) : "S")  << "]: " << counter(counter_t::GLOB_REF_READ, i) << "\n";
+			s << "		[" << (i!=myid ? std::to_string(i) : "S")  << "]: " << counter(counter_t::GLOB_REF_READ, i) << "\n";
 		}
-		s << "Writes:\n";
+		s << "	Writes:\n";
 		for(size_t i = 0; i < size; ++i) {
-			s << "[" <<  (i!=myid ? std::to_string(i) : "S") << "]: " << counter(counter_t::GLOB_REF_WRITE, i) << "\n";
+			s << "		[" <<  (i!=myid ? std::to_string(i) : "S") << "]: " << counter(counter_t::GLOB_REF_WRITE, i) << "\n";
 		}
 		s << "Onesided Operations:\n";
-		s << "Put:\n";
+		s << "	Put:\n";
 		for(size_t i = 0; i < size; ++i) {
-			s << "[" <<  (i!=myid ? std::to_string(i) : "S") << "]: " << counter(counter_t::ONESIDEDED_PUT_BYTE, i) << " Byte in " << counter(counter_t::ONESIDEDED_PUT_NUM, i) << " operations" << "\n";
+			s << "		[" <<  (i!=myid ? std::to_string(i) : "S") << "]: " << counter(counter_t::ONESIDEDED_PUT_BYTE, i) << " Byte in " << counter(counter_t::ONESIDEDED_PUT_NUM, i) << " operations" << "\n";
 		}
-		s << "Get:\n";
+		s << "	Get:\n";
 		for(size_t i = 0; i < size; ++i) {
-			s << "[" <<  (i!=myid ? std::to_string(i) : "S") << "]: " << counter(counter_t::ONESIDEDED_GET_BYTE, i) << " Byte in " << counter(counter_t::ONESIDEDED_GET_NUM, i) << " operations" << "\n";
+			s << "		[" <<  (i!=myid ? std::to_string(i) : "S") << "]: " << counter(counter_t::ONESIDEDED_GET_BYTE, i) << " Byte in " << counter(counter_t::ONESIDEDED_GET_NUM, i) << " operations" << "\n";
 		}
 		std::cout << s.str() << std::endl;
 		reset();

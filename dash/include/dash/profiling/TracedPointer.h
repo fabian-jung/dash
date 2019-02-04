@@ -13,6 +13,7 @@ public:
 	using pointer = type;
 	using const_pointer = const pointer;
 	using reference = decltype(*(std::declval<pointer>()));
+	using difference_type = decltype(std::declval<pointer>()-std::declval<pointer>());
 
 	TracedPointer() noexcept:
 		ptr(nullptr)
@@ -189,13 +190,13 @@ public:
 
 	template <class numerical_t>
 	reference operator[](numerical_t rhs) {//Subscript
-		std::cout << "subscript" << std::endl;
+// 		std::cout << "subscript" << std::endl;
 		Profiler::get().trackDeref(ptr);
 		return ptr[rhs];
 	}
 
 	reference operator*() { // Indirection
-		std::cout << "indirection" << std::endl;
+// 		std::cout << "indirection" << std::endl;
 		Profiler::get().trackDeref(ptr);
 		return *ptr;
 	}
@@ -216,15 +217,15 @@ public:
 		return ptr->*member_pointer;
 	}
 
-// 	operator pointer() const {
-// 		std::cout << "convert to native" << std::endl;
-// 		return ptr;
-// 	}
+	operator pointer() const {
+		std::cout << "convert to native" << std::endl;
+		return ptr;
+	}
 
-// 	pointer native() const {
-// 		std::cout << "convert to native" << std::endl;
-// 		return ptr;
-// 	}
+	pointer native() const {
+		std::cout << "convert to native" << std::endl;
+		return ptr;
+	}
 
 	template <class fptr_t, class... Args>
 	auto traced_call(fptr_t f, Args&&... args) {
@@ -242,6 +243,15 @@ private:
 
 	template <class T2>
 	friend class TracedPointer;
+};
+
+}
+
+namespace std {
+
+template <class T>
+struct iterator_traits<dash::TracedPointer<T>> {
+	using difference_type = typename dash::TracedPointer<T>::difference_type;
 };
 
 }
