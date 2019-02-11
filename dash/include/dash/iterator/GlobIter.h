@@ -4,6 +4,7 @@
 #include <dash/Pattern.h>
 #include <dash/GlobRef.h>
 #include <dash/GlobPtr.h>
+#include <dash/GlobPtrImpl.hpp>
 
 #include <functional>
 #include <sstream>

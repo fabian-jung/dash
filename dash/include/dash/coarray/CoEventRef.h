@@ -3,6 +3,7 @@
 
 #include <dash/Team.h>
 #include <dash/GlobPtr.h>
+#include <dash/GlobRefImpl.h>
 #include <dash/Atomic.h>
 
 #include <dash/memory/MemorySpace.h>
@@ -33,7 +34,7 @@ public:
    */
   inline void post() const {
     DASH_LOG_DEBUG("post event to gptr", _gptr);
-    GlobRef<event_ctr_t> gref(_gptr);
+    GlobRef<event_ctr_t> gref(static_cast<const dart_gptr_t>(_gptr));
     gref.add(1);
     DASH_LOG_DEBUG("event posted");
   }
@@ -43,7 +44,7 @@ public:
    */
   inline int test() const {
     DASH_LOG_DEBUG("test for events on", _gptr);
-    GlobRef<event_ctr_t> gref(_gptr);
+    GlobRef<event_ctr_t> gref(static_cast<const dart_gptr_t>(_gptr));
     return gref.load();
   }
 

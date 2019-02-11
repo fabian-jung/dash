@@ -549,12 +549,12 @@ public:
 };
 
 template <class T>
-class GlobRef<dash::Atomic<T>> : public TracedReference<GlobRefImpl<dash::Atomic<T>>> {
+class TracedGlobRef<dash::Atomic<T>> : public TracedReference<GlobRefImpl<dash::Atomic<T>>> {
 public:
 
 	using const_type = typename GlobRefImpl<dash::Atomic<T>>::const_type;
 
-	GlobRef (dart_gptr_t dart_gptr) :
+	TracedGlobRef (dart_gptr_t dart_gptr) :
 		TracedReference<GlobRefImpl<dash::Atomic<T>>>(dart_gptr)
 	{}
 

@@ -5,6 +5,7 @@
 #include <numeric>
 #include <type_traits>
 
+#include <dash/GlobPtr.h>
 #include <dash/dart/if/dart_globmem.h>
 #include <dash/dart/if/dart_types.h>
 
@@ -12,9 +13,6 @@
 #include <dash/memory/MemorySpaceBase.h>
 
 namespace dash {
-
-template <class T, class MemSpaceT>
-class GlobPtr;
 
 namespace internal {
 

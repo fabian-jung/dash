@@ -45,7 +45,9 @@ class Team
   template <typename U, class P, class GM, class Ptr, class Ref >
     friend class GlobIter;
   template <typename U>
-    friend class GlobRef;
+    friend class GlobRefImpl;
+  template <typename U>
+    friend class TracedGlobRefImpl;
   friend std::ostream & operator<<(
     std::ostream & os,
     const Team & team);

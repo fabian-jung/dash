@@ -4,6 +4,8 @@
 #include <iostream>
 
 #include <dash/GlobPtr.h>
+#include <dash/GlobPtrImpl.hpp>
+#include <dash/GlobRefImpl.h>
 #include <dash/Onesided.h>
 
 #include <dash/iterator/internal/GlobRefBase.h>

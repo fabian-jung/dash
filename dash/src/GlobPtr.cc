@@ -1,4 +1,5 @@
 #include <dash/GlobPtr.h>
+#include <dash/GlobPtrImpl.hpp>
 
 std::ostream & operator<<(
   std::ostream      & os,

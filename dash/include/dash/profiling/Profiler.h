@@ -20,8 +20,29 @@ class ProfilerImpl;
 
 template<>
 class ProfilerImpl<false> {
+public:
+	static ProfilerImpl& get() {
+		static ProfilerImpl prof;
+		return prof;
+	}
+
+	void trackOnesidedPut(size_t bytes, size_t id) {}
+	void trackOnesidedGet(size_t bytes, size_t id) {}
+	template <class T> void trackRead(const GlobRefImpl<T>& ref) {}
+	template <class T> void trackWrite(const GlobRefImpl<T>& ref) {}
+	template <class T, class MemSpaceT> void trackDeref(const GlobPtrImpl<T, MemSpaceT>& ptr) {}
+	template <class T> void trackDeref(const T* ptr) {}
+	void report(std::string stage) {}
 
 
+	ProfilerImpl(const ProfilerImpl& cpy) = delete;
+	ProfilerImpl& operator=(const ProfilerImpl& cpy) = delete;
+
+	ProfilerImpl(ProfilerImpl&& mov) = delete;
+	ProfilerImpl& operator=(ProfilerImpl&& mov) = delete;
+
+private:
+	ProfilerImpl() = default;
 };
 
 template <>
@@ -115,6 +136,13 @@ public:
 		std::cout << s.str() << std::endl;
 		reset();
 	}
+
+	ProfilerImpl(const ProfilerImpl& cpy) = delete;
+	ProfilerImpl& operator=(const ProfilerImpl& cpy) = delete;
+
+	ProfilerImpl(ProfilerImpl&& mov) = delete;
+	ProfilerImpl& operator=(ProfilerImpl&& mov) = delete;
+
 private:
 
 	const size_t myid;
@@ -128,12 +156,6 @@ private:
 			v.resize(size);
 		}
 	}
-
-	ProfilerImpl(const ProfilerImpl& cpy) = delete;
-	ProfilerImpl& operator=(const ProfilerImpl& cpy) = delete;
-
-	ProfilerImpl(ProfilerImpl&& mov) = delete;
-	ProfilerImpl& operator=(ProfilerImpl&& mov) = delete;
 
 	std::array<std::vector<size_t>, static_cast<size_t>(counter_t::SIZE)> _counter;
 

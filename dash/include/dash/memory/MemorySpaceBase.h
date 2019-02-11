@@ -9,6 +9,8 @@
 #include <cpp17/polymorphic_allocator.h>
 
 
+#include <dash/GlobPtr.h>
+// #include <dash/GlobPtrImpl.hpp>
 #include <dash/Meta.h>
 #include <dash/Types.h>
 
@@ -16,11 +18,6 @@
 #include <dash/memory/internal/MemorySpaceRegistry.h>
 
 namespace dash {
-
-/// Forward declarations
-
-template <typename ElementType, class MemorySpace>
-class GlobPtr;
 
 /**
  * The \c MemorySpace concept follows the STL \c std::pmr::memory_resource.
