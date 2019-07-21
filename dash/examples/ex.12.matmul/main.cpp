@@ -137,8 +137,7 @@ int main(int argc, char* argv[]) {
 
 	const auto myid = dash::myid();
 	const auto size = dash::size();
-// 	const size_t dim = 512;
-	const size_t max_dim = 16384;
+	using value_type = double;
 	std::vector<size_t> dims = {
 		128,
 		181,
@@ -158,49 +157,64 @@ int main(int argc, char* argv[]) {
 	};
 
 
-	dash::Array<int> lhs(max_dim*max_dim);
-	profiler.container_set_name(lhs, "lhs");
-	dash::Array<int> rhs(max_dim*max_dim);
-	profiler.container_set_name(rhs, "rhs");
-	dash::Array<int> res3(max_dim*max_dim);
-	profiler.container_set_name(res3, "res3");
-	dash::Array<int> res4(max_dim*max_dim);
-	profiler.container_set_name(res4, "res4");
+/*
 
-	std::fill(res3.lbegin(), res3.lend(), 0);
-	std::fill(res4.lbegin(), res4.lend(), 0);
 
 	std::random_device rd;  //Will be used to obtain a seed for the random number engine
 	std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
 	uniform_distribution<int>::type dis(-10, 10);
 
 	dash::generate(lhs.begin(), lhs.end(), std::bind(dis, gen));
-	dash::generate(rhs.begin(), rhs.end(), std::bind(dis, gen));
+	dash::generate(rhs.begin(), rhs.end(), std::bind(dis, gen));*/
 
 	profiler.reset();
 	dash::Team::All().barrier();
 //
-	for(auto dim : dims) {
-	std::vector<int> rhs_line(max_dim);
+	for(const auto dim : dims) {
+		const auto rows_per_unit = (dim+size-1)/size;
+		const auto array_length = rows_per_unit*dim*size;
+
+		dash::Array<value_type> lhs(array_length);
+		profiler.container_set_name(lhs, "lhs");
+		dash::Array<value_type> rhs(array_length);
+		profiler.container_set_name(rhs, "rhs");
+		dash::Array<value_type> res4(array_length);
+		profiler.container_set_name(res4, "res4");
+
+		dash::fill(lhs.begin(), lhs.end(), 0);
+		dash::fill(rhs.begin(), rhs.end(), 0);
+		if(myid == 0) {
+			for(unsigned int i = 0; i < dim; ++i) {
+				lhs[i*dim+i] = 1;
+				rhs[i*dim+i] = 1;
+			}
+		}
+		dash::barrier();
+
+		std::vector<value_type> rhs_line(dim);
+
 		sw.run(
 			(std::string("mul_local_cached_")+std::to_string(dim)).c_str(),
 			[&](){
-				const auto stride = dim/size;
+				std::fill(res4.lbegin(), res4.lend(), 0);
+
+				const auto imax = std::min(rows_per_unit, dim-(myid*rows_per_unit));
 				for(size_t k_rank = 0; k_rank < size; ++k_rank) {
+					const auto kmax = std::min((k_rank+1)*rows_per_unit, dim);
 					if(k_rank != myid) {
-						for(size_t k = k_rank*stride; k < (k_rank+1)*stride; ++k) {
+						for(size_t k = k_rank*rows_per_unit; k < kmax; ++k) {
 							dash::internal::get(rhs[k*dim].dart_gptr(), rhs_line.data(), dim);
-							for(size_t i = 0; i < stride; ++i) {
+							for(size_t i = 0; i < imax; ++i) {
 								for(size_t j = 0; j < dim; ++j) {
 									res4.lbegin()[i*dim+j] += lhs.lbegin()[k+i*dim] * rhs_line[j];
 								}
 							}
 						}
 					} else {
-						for(size_t i = 0; i < stride; ++i) {
-							for(size_t k = 0; k < stride; ++k) {
+						for(size_t i = 0; i < imax; ++i) {
+							for(size_t k = k_rank*rows_per_unit; k < kmax; ++k) {
 								for(size_t j = 0; j < dim; ++j) {
-									res4.lbegin()[i*dim+j] += lhs.lbegin()[(k+myid*stride)+i*dim] * rhs.lbegin()[k*dim+j];
+									res4.lbegin()[i*dim+j] += lhs.lbegin()[k+i*dim] * rhs.lbegin()[(k-k_rank*rows_per_unit)*dim+j];
 								}
 							}
 						}

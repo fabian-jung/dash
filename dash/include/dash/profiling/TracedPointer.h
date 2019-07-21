@@ -8,19 +8,19 @@
 namespace dash {
 
 template <class type>
-class TracedPointer {
+class TracedPointerImpl {
 public:
 	using pointer = type;
 	using const_pointer = const pointer;
 	using reference = decltype(*(std::declval<pointer>()));
 	using difference_type = decltype(std::declval<pointer>()-std::declval<pointer>());
 
-	TracedPointer() noexcept:
+	TracedPointerImpl() noexcept:
 		ptr(nullptr)
 	{
 	}
 
-	TracedPointer(std::nullptr_t ptr) noexcept:
+	TracedPointerImpl(std::nullptr_t ptr) noexcept:
 		ptr(ptr)
 	{
 	}
@@ -38,84 +38,84 @@ public:
 			>::value
 		>::type*/
 	>
-	TracedPointer(const TracedPointer<From>& conv) noexcept :
+	TracedPointerImpl(const TracedPointerImpl<From>& conv) noexcept :
 		ptr(conv.ptr)
 	{
 	}
 
-	TracedPointer& operator=(const TracedPointer<typename std::remove_const<pointer>::type>& cpy) noexcept {
+	TracedPointerImpl& operator=(const TracedPointerImpl<typename std::remove_const<pointer>::type>& cpy) noexcept {
 		ptr = cpy.ptr;
 		return *this;
 	}
 
-	TracedPointer(const TracedPointer& copy) noexcept :
+	TracedPointerImpl(const TracedPointerImpl& copy) noexcept :
 		ptr(copy.ptr)
 	{
 	}
 
-	TracedPointer(TracedPointer&& move) noexcept :
+	TracedPointerImpl(TracedPointerImpl&& move) noexcept :
 		ptr(std::move(move.ptr))
 	{
 	}
 
-	TracedPointer& operator=(TracedPointer&& move) noexcept {
+	   TracedPointerImpl& operator=(TracedPointerImpl&& move) noexcept {
 		ptr = std::move(move.ptr);
 		return *this;
 	}
 
-	TracedPointer(pointer conv) noexcept :
+	TracedPointerImpl(pointer conv) noexcept :
 		ptr(conv)
 	{
 // 		std::cout << "TracedPointer" << std::endl;
 	}
 
-	TracedPointer& operator=(pointer conv) noexcept {
+	   TracedPointerImpl& operator=(pointer conv) noexcept {
 		ptr = conv;
 		return *this;
 	}
 
-	TracedPointer& operator=(const pointer& conv) noexcept {
+	   TracedPointerImpl& operator=(const pointer& conv) noexcept {
 		ptr = conv;
 		return *this;
 	}
 
-	TracedPointer& operator=(pointer&& conv) noexcept {
+	   TracedPointerImpl& operator=(pointer&& conv) noexcept {
 		ptr = std::move(conv); // Might or might not be useful for GlobPtr
 		return *this;
 	}
 
 	template <class numerical_t>
-	TracedPointer operator+(numerical_t rhs) const noexcept {
-		return TracedPointer(ptr + rhs);
+	   TracedPointerImpl operator+(numerical_t rhs) const noexcept {
+		return TracedPointerImpl(ptr + rhs);
 	}
 
 	template <class numerical_t>
-	TracedPointer operator-(numerical_t rhs) const noexcept {
-		return TracedPointer(ptr - rhs);
+	   TracedPointerImpl operator-(numerical_t rhs) const noexcept {
+		return TracedPointerImpl(ptr - rhs);
 	}
 
-	TracedPointer& operator++() { // prefix
+	   TracedPointerImpl& operator++() { // prefix
 		++ptr;
 		return *this;
 	}
-	TracedPointer operator++(int) { // postfix
+	   TracedPointerImpl operator++(int) { // postfix
 		auto tmp = *this;
 		ptr++;
 		return tmp;
 	}
 
-	TracedPointer& operator--() { // prefix
+	   TracedPointerImpl& operator--() { // prefix
 		--ptr;
 		return *this;
 	}
 
-	TracedPointer operator--(int) { // postfix
+	   TracedPointerImpl operator--(int) { // postfix
 		auto tmp = *this;
 		ptr--;
 		return tmp;
 	}
 
-	bool operator==(const TracedPointer& rhs) const{
+	bool operator==(const TracedPointerImpl& rhs) const{
 		return ptr == rhs.ptr;
 	}
 
@@ -123,7 +123,7 @@ public:
 		return ptr == rhs;
 	}
 
-	bool operator!=(const TracedPointer& rhs) const {
+	bool operator!=(const TracedPointerImpl& rhs) const {
 		return ptr != rhs.ptr;
 	}
 
@@ -131,7 +131,7 @@ public:
 		return ptr != rhs;
 	}
 
-	bool operator>(const TracedPointer& rhs) const {
+	bool operator>(const TracedPointerImpl& rhs) const {
 		return ptr > rhs.ptr;
 	}
 
@@ -139,14 +139,14 @@ public:
 		return ptr > rhs;
 	}
 
-	bool operator>=(const TracedPointer& rhs) const {
+	bool operator>=(const TracedPointerImpl& rhs) const {
 		return ptr >= rhs.ptr;
 	}
 	bool operator>=(const_pointer rhs) const {
 		return ptr >= rhs;
 	}
 
-	bool operator<(const TracedPointer& rhs) const  {
+	bool operator<(const TracedPointerImpl& rhs) const  {
 		return ptr < rhs.ptr;
 	}
 
@@ -154,7 +154,7 @@ public:
 		return ptr < rhs;
 	}
 
-	bool operator<=(const TracedPointer& rhs) const {
+	bool operator<=(const TracedPointerImpl& rhs) const {
 		return ptr <= rhs.ptr;
 	}
 
@@ -177,13 +177,13 @@ public:
 	}
 
 	template <class numerical_t>
-	TracedPointer& operator+=(numerical_t rhs) {
+	   TracedPointerImpl& operator+=(numerical_t rhs) {
 		ptr += rhs;
 		return *this;
 	}
 
 	template <class numerical_t>
-	TracedPointer& operator-=(numerical_t rhs) {
+	   TracedPointerImpl& operator-=(numerical_t rhs) {
 		ptr -= rhs;
 		return *this;
 	}
@@ -242,16 +242,19 @@ private:
 	const Profiler& profiler = Profiler::get();
 
 	template <class T2>
-	friend class TracedPointer;
+	friend class TracedPointerImpl;
 };
+
+template <class type>
+using TracedPointer = typename conditional_type<profiling_enabled::value, TracedPointerImpl<type>, type>::type;
 
 }
 
 namespace std {
 
 template <class T>
-struct iterator_traits<dash::TracedPointer<T>> {
-	using difference_type = typename dash::TracedPointer<T>::difference_type;
+struct iterator_traits<dash::TracedPointerImpl<T>> {
+	using difference_type = typename dash::TracedPointerImpl<T>::difference_type;
 };
 
 }

@@ -3,26 +3,6 @@
 #include <dash/profiling/TracedPointer.h>
 #include <dash/Onesided.h>
 
-template <class D, bool b = std::is_integral<D>::value>
-struct uniform_distribution;
-
-
-template <class D>
-struct uniform_distribution<D, true> {
-	using type = std::uniform_int_distribution<D>;
-};
-
-template <class D>
-struct uniform_distribution<D, false> {
-	using type = std::uniform_real_distribution<D>;
-};
-
-template <class T>
-auto get(const size_t dim, dash::Array<T>& arr, size_t i, size_t j) {
-	return arr[i*dim + j];
-}
-
-
 class stop_watch_t {
 	using clock = std::chrono::high_resolution_clock;
 	using desc = std::chrono::duration<double>;
@@ -122,14 +102,13 @@ public:
 
 };
 
-
 int main(int argc, char* argv[]) {
 	dash::init(&argc, &argv);
 	decltype(auto) profiler = dash::Profiler::get();
 
 	stop_watch_t sw(
-		std::chrono::seconds(600),
-		17,//4096,
+		std::chrono::seconds(3600),
+		15,//4096,
 		&dash::barrier,
 		[]() { return dash::myid()==0; },
 		[]() { return dash::size(); }
@@ -137,51 +116,44 @@ int main(int argc, char* argv[]) {
 
 	const auto myid = dash::myid();
 	const auto size = dash::size();
-// 	const size_t dim = 512;
-	const size_t max_dim = 2048;
+	using value_type = double;
+	const size_t dim = 2048;
+	const auto rows_per_unit = (dim+size-1)/size;
 
 
-	dash::Array<int> lhs(max_dim*max_dim);
+	const auto array_length = rows_per_unit*dim*size;
+
+	dash::Array<value_type> lhs(array_length);
 	profiler.container_set_name(lhs, "lhs");
-	dash::Array<int> rhs(max_dim*max_dim);
+	dash::Array<value_type> rhs(array_length);
 	profiler.container_set_name(rhs, "rhs");
-// 	dash::Array<int> res(max_dim*max_dim);
+// 	dash::Array<value_type> res(array_length);
 // 	profiler.container_set_name(res, "res");
-// 	dash::Array<int> res2(max_dim*max_dim);
-// 	profiler.container_set_name(res2, "res2");
-	dash::Array<int> res3(max_dim*max_dim);
+	dash::Array<value_type> res3(array_length);
 	profiler.container_set_name(res3, "res3");
-	dash::Array<int> res4(max_dim*max_dim);
+	dash::Array<value_type> res4(array_length);
 	profiler.container_set_name(res4, "res4");
 // 	profiler.report("Init");
 
-// 	dash::fill(res.begin(), res.end(), 0);
-// 	dash::fill(res2.begin(), res2.end(), 0);
-//	dash::fill(res3.begin(), res3.end(), static_cast<int>(0));
-//	dash::fill(res4.begin(), res4.end(), static_cast<int>(0));
-	std::fill(res3.lbegin(), res3.lend(), 0);
-	std::fill(res4.lbegin(), res4.lend(), 0);
+	dash::fill(lhs.begin(), lhs.end(), 0);
+	dash::fill(rhs.begin(), rhs.end(), 0);
 
-	std::random_device rd;  //Will be used to obtain a seed for the random number engine
-	std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
-	uniform_distribution<int>::type dis(-10, 10);
-
-	dash::generate(lhs.begin(), lhs.end(), std::bind(dis, gen));
-	dash::generate(rhs.begin(), rhs.end(), std::bind(dis, gen));
-
-	dash::Team::All().barrier();
+	if(myid == 0) {
+		for(unsigned int i = 0; i < dim; ++i) {
+			lhs[i*dim+i] = 1;
+			rhs[i*dim+i] = 1;
+		}
+	}
+	dash::barrier();
 	profiler.reset();
 
-
-// 	dash::fill(arr.begin(), arr.end(), 42);
-// 	auto gptr = arr.data();
-
-//
+// 	if(myid == 0)
 // 	{
-// 		for(size_t i = myid*stride; i < (myid+1)*stride; ++i) {
+// 		dash::fill(res.begin(), res.end(), 0);
+// 		for(size_t i = 0; i < dim; ++i) {
 // 			for(size_t j = 0; j < dim; ++j) {
 // 				for(size_t k = 0; k < dim; ++k) {
-// 					res[i*dim+j] += lhs[k+i*dim] * get(dim, rhs, k, j);
+// 					res[i*dim+j] += lhs[k+i*dim] * rhs[k*dim+j];
 // 				}
 // 			}
 // 		}
@@ -202,27 +174,29 @@ int main(int argc, char* argv[]) {
 // 	profiler.report("Multiplication_local");
 	dash::Team::All().barrier();
 //
-	std::vector<int> rhs_line(max_dim);
+	std::vector<value_type> rhs_line(dim);
 	sw.run(
-		(std::string("mul_local_cached_")+std::to_string(max_dim)).c_str(),
+		(std::string("mul_local_cached_")+std::to_string(dim)).c_str(),
 		[&](){
-			constexpr auto dim = max_dim;
-			const auto stride = dim/size;
+			std::fill(res4.lbegin(), res4.lend(), 0);
+
+			const auto imax = std::min(rows_per_unit, dim-(myid*rows_per_unit));
 			for(size_t k_rank = 0; k_rank < size; ++k_rank) {
+				const auto kmax = std::min((k_rank+1)*rows_per_unit, dim);
 				if(k_rank != myid) {
-					for(size_t k = k_rank*stride; k < (k_rank+1)*stride; ++k) {
+					for(size_t k = k_rank*rows_per_unit; k < kmax; ++k) {
 						dash::internal::get(rhs[k*dim].dart_gptr(), rhs_line.data(), dim);
-						for(size_t i = 0; i < stride; ++i) {
+						for(size_t i = 0; i < imax; ++i) {
 							for(size_t j = 0; j < dim; ++j) {
 								res4.lbegin()[i*dim+j] += lhs.lbegin()[k+i*dim] * rhs_line[j];
 							}
 						}
 					}
 				} else {
-					for(size_t i = 0; i < stride; ++i) {
-						for(size_t k = 0; k < stride; ++k) {
+					for(size_t i = 0; i < imax; ++i) {
+						for(size_t k = k_rank*rows_per_unit; k < kmax; ++k) {
 							for(size_t j = 0; j < dim; ++j) {
-								res4.lbegin()[i*dim+j] += lhs.lbegin()[(k+myid*stride)+i*dim] * rhs.lbegin()[k*dim+j];
+								res4.lbegin()[i*dim+j] += lhs.lbegin()[k+i*dim] * rhs.lbegin()[(k-k_rank*rows_per_unit)*dim+j];
 							}
 						}
 					}
@@ -233,24 +207,26 @@ int main(int argc, char* argv[]) {
 //	profiler.report("Multiplication_all_local_cached");
 
 	sw.run(
-		("mul_local_"+std::to_string(max_dim/2)+"^2").c_str(),
+		("mul_local_"+std::to_string(dim)+"^2").c_str(),
 		[&](){
-			constexpr auto dim = max_dim/2;
-		   	const auto stride = dim/size;
+			std::fill(res3.lbegin(), res3.lend(), 0);
+			const auto imax = std::min(rows_per_unit, dim-(myid*rows_per_unit));
 			for(size_t j = 0; j < dim; ++j) {
 				for(size_t k_rank = 0; k_rank < size; ++k_rank) {
+					const auto kmax = std::min((k_rank+1)*rows_per_unit, dim);
+
 					if(k_rank != myid) {
-						for(size_t k = k_rank*stride; k < (k_rank+1)*stride; ++k) {
-							int r;
-							dash::internal::get(get(dim, rhs, k, j).dart_gptr(), &r, 1);
-							for(size_t i = 0; i < stride; ++i) {
+						for(size_t k = k_rank*rows_per_unit; k < kmax; ++k) {
+							value_type r;
+							dash::internal::get(rhs[dim*k+j].dart_gptr(), &r, 1);
+							for(size_t i = 0; i < imax; ++i) {
 								res3.lbegin()[i*dim+j] += lhs.lbegin()[k+i*dim] * r;
 							}
 						}
 					} else {
-						for(size_t i = 0; i < stride; ++i) {
-							for(size_t k = 0; k < stride; ++k) {
-								res3.lbegin()[i*dim+j] += lhs.lbegin()[(k+myid*stride)+i*dim] * rhs.lbegin()[k*dim+j];
+						for(size_t i = 0; i < imax; ++i) {
+							for(size_t k = k_rank*rows_per_unit; k < kmax; ++k) {
+								res3.lbegin()[i*dim+j] += lhs.lbegin()[k+i*dim] * rhs.lbegin()[(k-k_rank*rows_per_unit)*dim+j];
 							}
 						}
 					}
@@ -262,27 +238,24 @@ int main(int argc, char* argv[]) {
 
 //
 // 	if(myid == 0) {
-// 		for(auto it = res.begin(); it != res.end(); ++it) {
-// 			std::cout << static_cast<int>(*it) << ", ";
+// 		std::vector<dash::Array<value_type>*> results {&res, &res3, &res4};
+// 		for(auto& r : results) {
+// 			std::ostream_iterator<value_type> out(std::cout, " ");
+// 			for(auto i = 0; i < rows_per_unit*size; ++i) {
+// 				auto begin = r->begin() + i*dim;
+// 				std::copy(begin, begin+dim, out);
+// 				std::cout << std::endl;
+// 			}
+// 			std::cout << std::endl;
 // 		}
-// 		std::cout << std::endl;
-// 		for(auto it = res2.begin(); it != res2.end(); ++it) {
-// 			std::cout << static_cast<int>(*it) << ", ";
-// 		}
-// 		std::cout << std::endl;
-// 		for(auto it = res3.begin(); it != res3.end(); ++it) {
-// 			std::cout << static_cast<int>(*it) << ", ";
-// 		}
-// 		std::cout << std::endl;
 // 	}
 // 	if(
 // 		!(
-// // 			std::equal(res.begin(), res.end(), res2.begin()) &&
-// // 			std::equal(res.begin(), res.end(), res3.begin()) &&
-// 			std::equal(res3.begin(), res3.end(), res4.begin())
+// 			std::equal(res.begin(), res.end(), res3.begin()) &&
+// 			std::equal(res.begin(), res.end(), res4.begin())
 // 		)
-//
 // 	) {
+// 		std::cerr << "ERROR: Matmul implementation is not correct." << std::endl;
 // 		return 1;
 // 	}
 // 	dash::Team::All().barrier();
