@@ -74,7 +74,7 @@ public:
 	}
 
 	TracedReference& operator= (const value_type val) {
-		std::cout << "TracedReference: Traced Ref Assignment" << std::endl;
+// 		std::cout << "TracedReference: Traced Ref Assignment" << std::endl;
 		profiler.trackWrite(ref);
 		ref.operator=(val);
 		return *this;
@@ -133,7 +133,7 @@ public:
 	template <class fptr_t, class... Args>
 	auto traced_call(fptr_t f, Args&&... args) {
 // 		profiler.track(ref, f);
-		std::cout << "TracedReference: Traced Ref Call" << std::endl;
+// 		std::cout << "TracedReference: Traced Ref Call" << std::endl;
 		return (ref.*f)(std::forward<Args>(args)...);
 	}
 
