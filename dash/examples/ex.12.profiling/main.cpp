@@ -108,7 +108,7 @@ int main(int argc, char* argv[]) {
 
 	stop_watch_t sw(
 		std::chrono::seconds(3600),
-		15,//4096,
+		1,//4096,
 		&dash::barrier,
 		[]() { return dash::myid()==0; },
 		[]() { return dash::size(); }

@@ -13,6 +13,9 @@
 #include <dash/Types.h>
 #include <dash/Team.h>
 // #include <dash/GlobRef.h>
+#ifdef DASH_ENABLE_PAPI
+#include "papi.h" /* This needs to be included every time you use PAPI */
+#endif
 
 #include <dash/profiling/CSBuffer.h>
 
@@ -118,6 +121,11 @@ namespace detail {
 
 template <>
 class ProfilerImpl<true> {
+#ifdef DASH_ENABLE_PAPI
+	constexpr static bool papi_enabled = true;
+#else
+	constexpr static bool papi_enabled = false;
+#endif
 public:
 
 	static ProfilerImpl& get() {
@@ -129,10 +137,24 @@ public:
 // 		report("Final");
 	}
 
+	void papi_counter_inc(size_t counter) {
+#ifdef DASH_ENABLE_PAPI
+		std::array<long long, papi_counter_t::size> values;
+		if(PAPI_read(eventset, values.data()) != PAPI_OK) {
+			throw std::runtime_error("Could not read values from eventset");
+		}
+		++values[counter];
+		if(PAPI_write(eventset, values.data()) != PAPI_OK) {
+			throw std::runtime_error("Could not write values to eventset");
+		}
+#endif
+	}
+
 	void trackOnesidedPut(const dart_gptr_t& gptr, size_t bytes) {
 		if(filter.onesided_communication) {
 			fetch_counter(gptr, &container_counter_t::onesided_put_byte) += bytes;
 			++fetch_counter(gptr, &container_counter_t::onesided_put_num);
+			papi_counter_inc(papi_counter_t::onesided_put_num);
 		}
 	}
 
@@ -140,6 +162,7 @@ public:
 		if(filter.onesided_communication) {
 			fetch_counter(gptr, &container_counter_t::onesided_get_byte) += bytes;
 			++fetch_counter(gptr, &container_counter_t::onesided_get_num);
+			papi_counter_inc(papi_counter_t::onesided_get_num);
 		}
 	}
 
@@ -147,6 +170,7 @@ public:
 	void trackRead(const GlobRefImpl<T>& ref) {
 		if(filter.global_reference) {
 			++fetch_counter(ref.dart_gptr(), &container_counter_t::glob_ref_read);
+			papi_counter_inc(papi_counter_t::glob_ref_read);
 		}
 	}
 
@@ -154,6 +178,7 @@ public:
 	void trackWrite(const GlobRefImpl<T>& ref) {
 		if(filter.global_reference) {
 			++fetch_counter(ref.dart_gptr(), &container_counter_t::glob_ref_write);
+			papi_counter_inc(papi_counter_t::glob_ref_write);
 		}
 	}
 
@@ -161,6 +186,7 @@ public:
 	void trackDeref(const GlobPtrImpl<T, MemSpaceT>& ptr) {
 		if(filter.global_pointer) {
 			++fetch_counter(ptr.dart_gptr(), &container_counter_t::glob_ptr_deref);
+			papi_counter_inc(papi_counter_t::glob_ptr_deref);
 		}
 	}
 
@@ -168,6 +194,7 @@ public:
 	void trackDeref(const T* ptr) {
 		if(filter.local_pointer) {
 			++local_ptr_deref;
+			papi_counter_inc(papi_counter_t::local_ptr_deref);
 		}
 	}
 
@@ -375,10 +402,90 @@ private:
 	const size_t size;
 	const filter_t filter;
 
+	int papi_find_component(const char* name) {
+		int numCmps = PAPI_num_components();
+		printf("Number of PAPI components:%i\n", numCmps);
+		for(int i = 0; i < numCmps; ++i) {
+			const PAPI_component_info_t* info = PAPI_get_component_info(i);
+			if(strcmp(info->name, name) == 0) {
+				printf("Component %s found id = %i\n", info->name, i);
+				return i;
+			} else {
+	// 			printf("Component %s\n", info->name);
+			}
+		}
+		printf("Component %s could not be found\n", name);
+		return -1;
+	}
+
+	struct papi_counter_t {
+		constexpr static size_t glob_ref_read = 0;
+		constexpr static size_t glob_ref_write = 1;
+// 		constexpr static size_t glob_ptr_leaked = 2;
+		constexpr static size_t glob_ptr_deref = 2;
+
+		constexpr static size_t onesided_put_num = 3;
+// 		constexpr static size_t onesided_put_byte = 0;
+		constexpr static size_t onesided_get_num = 4;
+// 		constexpr static size_t onesided_get_byte = 0;
+		constexpr static size_t local_ptr_deref = 5;
+
+		constexpr static size_t size = 6;
+	};
+
 	ProfilerImpl() :
 		myid(dash::myid()),
 		size(dash::size())
 	{
+		std::cout << "Initialise profiler with papi_enabled = " << papi_enabled << std::endl;
+		if(papi_enabled) {
+			eventset = PAPI_NULL;
+			std::map<std::string, size_t> papi_map {
+				{"dash:::DASH_GLOB_REF_LVALUE_ACCESS", papi_counter_t::glob_ref_read},
+				{"dash:::DASH_GLOB_REF_RVALUE_ACCESS", papi_counter_t::glob_ref_write},
+				{"dash:::DASH_GLOB_PTR_ACCESS",        papi_counter_t::glob_ptr_deref},
+				{"dash:::DASH_ONESIDED_PUT",           papi_counter_t::onesided_put_num},
+				{"dash:::DASH_ONESIDED_GET",           papi_counter_t::onesided_get_num},
+				{"dash:::DASH_LOCAL_PTR_ACCESS",       papi_counter_t::local_ptr_deref}
+			};
+			if(PAPI_library_init(PAPI_VER_CURRENT) != PAPI_VER_CURRENT ) {
+				throw std::runtime_error("Could not initialise PAPI with current version. This is probably caused by a broken installation.");
+			}
+			int dash_cix = papi_find_component("dash");
+			if(dash_cix == -1) {
+				std::cerr << "Could not initialise the dash component in the PAPI library." << std::endl;
+			}
+			const PAPI_component_info_t* dash_info = PAPI_get_component_info(dash_cix);
+			std::array<size_t, papi_counter_t::size> papi_event_codes;
+
+			int EventCode = PAPI_NATIVE_MASK;
+			if(PAPI_enum_cmp_event(&EventCode, PAPI_ENUM_FIRST, dash_cix) != PAPI_OK) {
+				throw std::runtime_error("Could not get EventCodes for dash component in PAPI.");
+			}
+
+			do {
+				std::string name;
+				name.resize(PAPI_MAX_STR_LEN);
+				if(PAPI_event_code_to_name(EventCode, &name[0]) != PAPI_OK) {
+					throw std::runtime_error("Could not resolve PAPI counter name");
+				}
+				const auto pos = papi_map[name];
+				papi_event_codes[pos] = EventCode;
+			} while(PAPI_enum_cmp_event(&EventCode, PAPI_ENUM_EVENTS, dash_cix) == PAPI_OK);
+			if ( PAPI_create_eventset(&eventset) != PAPI_OK) {
+				throw std::runtime_error("Could not create a PAPI eventset.");
+			}
+			/* Assign dash as component to the eventset */
+			if ( PAPI_assign_eventset_component(eventset, dash_cix) != PAPI_OK) {
+				throw std::runtime_error("Could not assign dash as PAPI eventset component.");
+			}
+
+			for(const auto c : papi_event_codes) {
+				if (PAPI_add_event(eventset,c) != PAPI_OK) {
+					std::runtime_error("Could not add papi counter to eventset");
+				}
+			}
+		}
 		container_map.get_inner()[nullptr].name = "<Unknown container>";
 	}
 
@@ -444,6 +551,8 @@ private:
 
 	detail::container_map_t<gptr_identififaction_t, container_t> container_map;
 	size_t local_ptr_deref;
+
+	int eventset; // PAPI Eventset id
 
 	void print(std::ostream& stream, const std::vector<container_counter_t>& counter, int unit_id) {
 		if(filter.global_pointer) {

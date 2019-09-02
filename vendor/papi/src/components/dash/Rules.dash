@@ -1,0 +1,5 @@
+COMPSRCS += components/dash/dash.c
+COMPOBJS += dash.o
+
+dash.o: components/dash/dash.c components/dash/dash.h $(HEADERS)
+	$(CC) $(LIBCFLAGS) $(OPTFLAGS) -c components/dash/dash.c -o dash.o

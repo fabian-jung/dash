@@ -24,10 +24,7 @@
 # Official PAPI source code repository:
 # - git clone https://icl.cs.utk.edu/git/papi.git
 
-find_path(
-  PAPI_PREFIX
-  NAMES include/papi.h
-)
+set(PAPI_PREFIX ${CMAKE_SOURCE_DIR}/vendor/papi/src)
 
 message(STATUS "Searching for PAPI in path " ${PAPI_PREFIX})
 
@@ -35,13 +32,13 @@ find_library(
   PAPI_LIBRARIES
   # Pick the static library first for easier run-time linking.
   NAMES papi
-  HINTS ${PAPI_PREFIX}/lib
+  HINTS ${PAPI_PREFIX}
 )
 
 find_path(
   PAPI_INCLUDE_DIRS
   NAMES papi.h
-  HINTS ${PAPI_PREFIX}/include
+  HINTS ${PAPI_PREFIX}
 )
 
 include(FindPackageHandleStandardArgs)
