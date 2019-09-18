@@ -13,9 +13,9 @@
 #include <dash/Types.h>
 #include <dash/Team.h>
 // #include <dash/GlobRef.h>
-#ifdef DASH_ENABLE_PAPI
-#include "papi.h" /* This needs to be included every time you use PAPI */
-#endif
+
+#include "ContainerDescription.h"
+#include "DashPapi.h"
 
 #include <dash/profiling/CSBuffer.h>
 
@@ -46,17 +46,17 @@ public:
 	void report(std::string stage) {}
 	void reset() {}
 
-	template <class container_t>
-	void container_set_name(const container_t& container, const char* name) {}
+	template <class ContainerDescription>
+	void container_set_name(const ContainerDescription& container, const char* name) {}
 
-	template <class container_t>
-	void container_register(const container_t& container) {}
+	template <class ContainerDescription>
+	void container_register(const ContainerDescription& container) {}
 
-	template <class container_t>
-	void container_unregister(const container_t& container) {}
+	template <class ContainerDescription>
+	void container_unregister(const ContainerDescription& container) {}
 
-	template <class container_t>
-	void container_move(const container_t& old_position, const container_t& new_position) {}
+	template <class ContainerDescription>
+	void container_move(const ContainerDescription& old_position, const ContainerDescription& new_position) {}
 
 	ProfilerImpl(const ProfilerImpl& cpy) = default;
 	ProfilerImpl& operator=(const ProfilerImpl& cpy) = default;
@@ -121,11 +121,6 @@ namespace detail {
 
 template <>
 class ProfilerImpl<true> {
-#ifdef DASH_ENABLE_PAPI
-	constexpr static bool papi_enabled = true;
-#else
-	constexpr static bool papi_enabled = false;
-#endif
 public:
 
 	static ProfilerImpl& get() {
@@ -137,56 +132,43 @@ public:
 // 		report("Final");
 	}
 
-	void papi_counter_inc(size_t counter) {
-#ifdef DASH_ENABLE_PAPI
-		std::array<long long, papi_counter_t::size> values;
-		if(PAPI_read(eventset, values.data()) != PAPI_OK) {
-			throw std::runtime_error("Could not read values from eventset");
-		}
-		++values[counter];
-		if(PAPI_write(eventset, values.data()) != PAPI_OK) {
-			throw std::runtime_error("Could not write values to eventset");
-		}
-#endif
-	}
-
 	void trackOnesidedPut(const dart_gptr_t& gptr, size_t bytes) {
 		if(filter.onesided_communication) {
-			fetch_counter(gptr, &container_counter_t::onesided_put_byte) += bytes;
-			++fetch_counter(gptr, &container_counter_t::onesided_put_num);
-			papi_counter_inc(papi_counter_t::onesided_put_num);
+			fetch_counter(gptr, &ContainerCounter::onesided_put_byte) += bytes;
+			++fetch_counter(gptr, &ContainerCounter::onesided_put_num);
+			papi.increment(papi_counter_t::onesided_put_num);
 		}
 	}
 
 	void trackOnesidedGet(const dart_gptr_t& gptr, size_t bytes) {
 		if(filter.onesided_communication) {
-			fetch_counter(gptr, &container_counter_t::onesided_get_byte) += bytes;
-			++fetch_counter(gptr, &container_counter_t::onesided_get_num);
-			papi_counter_inc(papi_counter_t::onesided_get_num);
+			fetch_counter(gptr, &ContainerCounter::onesided_get_byte) += bytes;
+			++fetch_counter(gptr, &ContainerCounter::onesided_get_num);
+			papi.increment(papi_counter_t::onesided_get_num);
 		}
 	}
 
 	template<class T>
 	void trackRead(const GlobRefImpl<T>& ref) {
 		if(filter.global_reference) {
-			++fetch_counter(ref.dart_gptr(), &container_counter_t::glob_ref_read);
-			papi_counter_inc(papi_counter_t::glob_ref_read);
+			++fetch_counter(ref.dart_gptr(), &ContainerCounter::glob_ref_read);
+			papi.increment(papi_counter_t::glob_ref_read);
 		}
 	}
 
 	template<class T>
 	void trackWrite(const GlobRefImpl<T>& ref) {
 		if(filter.global_reference) {
-			++fetch_counter(ref.dart_gptr(), &container_counter_t::glob_ref_write);
-			papi_counter_inc(papi_counter_t::glob_ref_write);
+			++fetch_counter(ref.dart_gptr(), &ContainerCounter::glob_ref_write);
+			papi.increment(papi_counter_t::glob_ref_write);
 		}
 	}
 
 	template <class T, class MemSpaceT>
 	void trackDeref(const GlobPtrImpl<T, MemSpaceT>& ptr) {
 		if(filter.global_pointer) {
-			++fetch_counter(ptr.dart_gptr(), &container_counter_t::glob_ptr_deref);
-			papi_counter_inc(papi_counter_t::glob_ptr_deref);
+			++fetch_counter(ptr.dart_gptr(), &ContainerCounter::glob_ptr_deref);
+			papi.increment(papi_counter_t::glob_ptr_deref);
 		}
 	}
 
@@ -194,7 +176,7 @@ public:
 	void trackDeref(const T* ptr) {
 		if(filter.local_pointer) {
 			++local_ptr_deref;
-			papi_counter_inc(papi_counter_t::local_ptr_deref);
+			papi.increment(papi_counter_t::local_ptr_deref);
 		}
 	}
 
@@ -210,7 +192,7 @@ public:
 			1, //nelem
 			dart_datatype<decltype(buffer_size)>::value, // sendtype,
 			0, //root
-			dash::Team::All().dart_id() //team
+			Team::All().dart_id() //team
 		);
 
 		auto total_size = std::accumulate(sizes.begin(), sizes.end(), 0);
@@ -224,12 +206,13 @@ public:
 			buffer.size(), //nelem
 			dart_datatype<char>::value, // sendtype,
 			0, //root
-			dash::Team::All().dart_id() //team
+			Team::All().dart_id() //team
 		);
 
 		if(myid == 0) {
 			for(auto unit_id = 0; unit_id < size; ++unit_id) {
-				std::remove_reference<decltype(container_map.get_inner())>::type map;
+				using map_type = typename std::remove_reference<decltype(container_map.get_inner())>::type;
+				map_type map;
 				recvBuffer >> map;
 				std::stringstream s;
 				s << "Profiler overview for stage [" << stage << "] and unit " << unit_id << ":\n";
@@ -249,11 +232,11 @@ public:
 					}
 				}
 				if(filter.team_based_logging) {
-					std::map<decltype(dart_gptr_t::teamid), std::vector<container_counter_t>> team_counter;
+					std::map<decltype(dart_gptr_t::teamid), std::vector<ContainerCounter>> team_counter;
 					for(const auto& inner_kv : map) {
 						auto team_id = inner_kv.second.teamid;
 						if(team_counter.count(team_id) == 0) {
-							team_counter.emplace(team_id, std::vector<container_counter_t>(size));
+							team_counter.emplace(team_id, std::vector<ContainerCounter>(size));
 						}
 						auto& tcv = team_counter.at(team_id);
 						const auto& cv = inner_kv.second.counter;
@@ -280,8 +263,8 @@ public:
 	ProfilerImpl(ProfilerImpl&& mov) = delete;
 	ProfilerImpl& operator=(ProfilerImpl&& mov) = delete;
 
-	template <class container_t>
-	void container_set_name(const container_t& container, const char* name) {
+	template <class ContainerDescription>
+	void container_set_name(const ContainerDescription& container, const char* name) {
 		if(filter.container_based_logging) {
 			const auto dart_gptr = container.begin().dart_gptr();
 			const auto id = std::make_tuple(dart_gptr.segid, dart_gptr.teamid, dart_gptr.unitid);
@@ -290,8 +273,8 @@ public:
 
 	}
 
-	template <class container_t>
-	void container_register(const container_t& container) {
+	template <class ContainerDescription>
+	void container_register(const ContainerDescription& container) {
 		if(filter.container_based_logging || filter.team_based_logging) {
 			std::set<gptr_identififaction_t> gptrs;
 			std::transform(
@@ -305,14 +288,14 @@ public:
 			);
 
 			auto& entry = container_map.insert(gptrs.begin(), gptrs.end(), &container);
-			entry.type = typeid(container_t).name();
+			entry.type = typeid(ContainerDescription).name();
 			entry.elements = container.size();
 			entry.teamid = container.team().dart_id();
 		}
 	}
 
-	template <class container_t>
-	void container_unregister(const container_t& container) {
+	template <class ContainerDescription>
+	void container_unregister(const ContainerDescription& container) {
 // 		if(filter.container_based_logging || filter.team_based_logging) {
 // 			std::set<gptr_identififaction_t> gptrs;
 // 			std::transform(
@@ -328,8 +311,8 @@ public:
 // 		}
 	}
 
-	template <class container_t>
-	void container_move(const container_t& old_position, const container_t& new_position) {
+	template <class ContainerDescription>
+	void container_move(const ContainerDescription& old_position, const ContainerDescription& new_position) {
 		if(filter.container_based_logging || filter.team_based_logging) {
 			container_map.move(&old_position, &new_position);
 		}
@@ -391,101 +374,22 @@ public:
 			std::fill(
 				cv.second.counter.begin(),
 				cv.second.counter.end(),
-				container_counter_t()
+				ContainerCounter()
 			);
 		}
 	}
 
 private:
+	PapiWrapper papi;
 
 	const size_t myid;
 	const size_t size;
 	const filter_t filter;
 
-	int papi_find_component(const char* name) {
-		int numCmps = PAPI_num_components();
-		printf("Number of PAPI components:%i\n", numCmps);
-		for(int i = 0; i < numCmps; ++i) {
-			const PAPI_component_info_t* info = PAPI_get_component_info(i);
-			if(strcmp(info->name, name) == 0) {
-				printf("Component %s found id = %i\n", info->name, i);
-				return i;
-			} else {
-	// 			printf("Component %s\n", info->name);
-			}
-		}
-		printf("Component %s could not be found\n", name);
-		return -1;
-	}
-
-	struct papi_counter_t {
-		constexpr static size_t glob_ref_read = 0;
-		constexpr static size_t glob_ref_write = 1;
-// 		constexpr static size_t glob_ptr_leaked = 2;
-		constexpr static size_t glob_ptr_deref = 2;
-
-		constexpr static size_t onesided_put_num = 3;
-// 		constexpr static size_t onesided_put_byte = 0;
-		constexpr static size_t onesided_get_num = 4;
-// 		constexpr static size_t onesided_get_byte = 0;
-		constexpr static size_t local_ptr_deref = 5;
-
-		constexpr static size_t size = 6;
-	};
-
 	ProfilerImpl() :
 		myid(dash::myid()),
 		size(dash::size())
 	{
-		std::cout << "Initialise profiler with papi_enabled = " << papi_enabled << std::endl;
-		if(papi_enabled) {
-			eventset = PAPI_NULL;
-			std::map<std::string, size_t> papi_map {
-				{"dash:::DASH_GLOB_REF_LVALUE_ACCESS", papi_counter_t::glob_ref_read},
-				{"dash:::DASH_GLOB_REF_RVALUE_ACCESS", papi_counter_t::glob_ref_write},
-				{"dash:::DASH_GLOB_PTR_ACCESS",        papi_counter_t::glob_ptr_deref},
-				{"dash:::DASH_ONESIDED_PUT",           papi_counter_t::onesided_put_num},
-				{"dash:::DASH_ONESIDED_GET",           papi_counter_t::onesided_get_num},
-				{"dash:::DASH_LOCAL_PTR_ACCESS",       papi_counter_t::local_ptr_deref}
-			};
-			if(PAPI_library_init(PAPI_VER_CURRENT) != PAPI_VER_CURRENT ) {
-				throw std::runtime_error("Could not initialise PAPI with current version. This is probably caused by a broken installation.");
-			}
-			int dash_cix = papi_find_component("dash");
-			if(dash_cix == -1) {
-				std::cerr << "Could not initialise the dash component in the PAPI library." << std::endl;
-			}
-			const PAPI_component_info_t* dash_info = PAPI_get_component_info(dash_cix);
-			std::array<size_t, papi_counter_t::size> papi_event_codes;
-
-			int EventCode = PAPI_NATIVE_MASK;
-			if(PAPI_enum_cmp_event(&EventCode, PAPI_ENUM_FIRST, dash_cix) != PAPI_OK) {
-				throw std::runtime_error("Could not get EventCodes for dash component in PAPI.");
-			}
-
-			do {
-				std::string name;
-				name.resize(PAPI_MAX_STR_LEN);
-				if(PAPI_event_code_to_name(EventCode, &name[0]) != PAPI_OK) {
-					throw std::runtime_error("Could not resolve PAPI counter name");
-				}
-				const auto pos = papi_map[name];
-				papi_event_codes[pos] = EventCode;
-			} while(PAPI_enum_cmp_event(&EventCode, PAPI_ENUM_EVENTS, dash_cix) == PAPI_OK);
-			if ( PAPI_create_eventset(&eventset) != PAPI_OK) {
-				throw std::runtime_error("Could not create a PAPI eventset.");
-			}
-			/* Assign dash as component to the eventset */
-			if ( PAPI_assign_eventset_component(eventset, dash_cix) != PAPI_OK) {
-				throw std::runtime_error("Could not assign dash as PAPI eventset component.");
-			}
-
-			for(const auto c : papi_event_codes) {
-				if (PAPI_add_event(eventset,c) != PAPI_OK) {
-					std::runtime_error("Could not add papi counter to eventset");
-				}
-			}
-		}
 		container_map.get_inner()[nullptr].name = "<Unknown container>";
 	}
 
@@ -496,65 +400,18 @@ private:
 			decltype(dart_gptr_t::unitid)
 		>;
 
-	struct container_counter_t {
-		size_t glob_ref_read = 0;
-		size_t glob_ref_write = 0;
-		size_t glob_ptr_leaked = 0;
-		size_t glob_ptr_deref = 0;
-
-		size_t onesided_put_num = 0;
-		size_t onesided_put_byte = 0;
-		size_t onesided_get_num = 0;
-		size_t onesided_get_byte = 0;
-
-		container_counter_t& operator+=(const container_counter_t& rhs) {
-			glob_ref_read       += rhs.glob_ref_read;
-			glob_ref_write      += rhs.glob_ref_write;
-			glob_ptr_leaked     += rhs.glob_ptr_leaked;
-			glob_ptr_deref      += rhs.glob_ptr_deref;
-
-			onesided_put_num    += rhs.onesided_put_num;
-			onesided_put_byte   += rhs.onesided_put_byte;
-			onesided_get_num    += rhs.onesided_get_num;
-			onesided_get_byte   += rhs.onesided_get_byte;
-
-			return *this;
-		}
-	};
-	friend ContigiousStreamBuffer& operator<<(ContigiousStreamBuffer& lhs, const container_counter_t& rhs);
-	friend ContigiousStreamBuffer& operator>>(ContigiousStreamBuffer& lhs, container_counter_t& rhs);
-
-
-
-	struct container_t {
-		std::string name;
-		std::string type;
-		size_t elements;
-		decltype(dart_gptr_t::teamid) teamid;
-		std::vector<container_counter_t> counter;
-
-		container_t() :
-			counter(dash::size())
-		{
-		}
-	};
-	friend ContigiousStreamBuffer& operator<<(ContigiousStreamBuffer& lhs, const container_t& rhs);
-	friend ContigiousStreamBuffer& operator>>(ContigiousStreamBuffer& lhs, container_t& rhs);
-
-	size_t& fetch_counter(const dart_gptr_t& gptr, size_t container_counter_t::* member) {
+	size_t& fetch_counter(const dart_gptr_t& gptr, size_t ContainerCounter::* member) {
 		return container_map[std::make_tuple(gptr.segid, gptr.teamid, gptr.unitid)].counter[gptr.unitid].*member;
 	}
 
-	const size_t& fetch_counter(const dart_gptr_t& gptr, size_t container_counter_t::* member) const {
+	const size_t& fetch_counter(const dart_gptr_t& gptr, size_t ContainerCounter::* member) const {
 		return container_map.at(std::make_tuple(gptr.segid, gptr.teamid, gptr.unitid)).counter[gptr.unitid].*member;
 	}
 
-	detail::container_map_t<gptr_identififaction_t, container_t> container_map;
+	detail::container_map_t<gptr_identififaction_t, ContainerDescription> container_map;
 	size_t local_ptr_deref;
 
-	int eventset; // PAPI Eventset id
-
-	void print(std::ostream& stream, const std::vector<container_counter_t>& counter, int unit_id) {
+	void print(std::ostream& stream, const std::vector<ContainerCounter>& counter, int unit_id) {
 		if(filter.global_pointer) {
 			stream <<"	GlobPtr Operations:\n";
 			stream <<"		Dereference Operations:\n";
@@ -587,54 +444,6 @@ private:
 	}
 
 };
-
-inline ContigiousStreamBuffer& operator<<(ContigiousStreamBuffer& lhs, const ProfilerImpl<true>::container_t& rhs) {
-	lhs << rhs.name;
-	lhs << rhs.type;
-	lhs << rhs.elements;
-	lhs << rhs.teamid;
-	lhs << rhs.counter;
-	return lhs;
-}
-
-inline ContigiousStreamBuffer& operator<<(ContigiousStreamBuffer& lhs, const ProfilerImpl<true>::container_counter_t& rhs) {
-	lhs << rhs.glob_ref_read;
-	lhs << rhs.glob_ref_write;
-	lhs << rhs.glob_ptr_leaked;
-	lhs << rhs.glob_ptr_deref;
-
-	lhs << rhs.onesided_put_num;
-	lhs << rhs.onesided_put_byte;
-	lhs << rhs.onesided_get_num;
-	lhs << rhs.onesided_get_byte;
-
-	return lhs;
-}
-
-inline ContigiousStreamBuffer& operator>>(ContigiousStreamBuffer& lhs, ProfilerImpl<true>::container_counter_t& rhs) {
-	lhs >> rhs.glob_ref_read;
-	lhs >> rhs.glob_ref_write;
-	lhs >> rhs.glob_ptr_leaked;
-	lhs >> rhs.glob_ptr_deref;
-
-	lhs >> rhs.onesided_put_num;
-	lhs >> rhs.onesided_put_byte;
-	lhs >> rhs.onesided_get_num;
-	lhs >> rhs.onesided_get_byte;
-
-	return lhs;
-}
-
-inline ContigiousStreamBuffer& operator>>(ContigiousStreamBuffer& lhs, ProfilerImpl<true>::container_t& rhs) {
-	lhs >> rhs.name;
-	lhs >> rhs.type;
-	lhs >> rhs.elements;
-	lhs >> rhs.teamid;
-	lhs >> rhs.counter;
-	return lhs;
-}
-
-
 
 using Profiler = ProfilerImpl<dash::profiling_enabled::value>;
 

@@ -320,7 +320,14 @@ _dash_stop( hwd_context_t *ctx, hwd_control_state_t *ctl )
 
 	/* anything that would need to be done at counter stop time */
 
-
+   dash_context_t *dash_ctx = (dash_context_t *) ctx;
+   dash_control_state_t *dash_ctl = ( dash_control_state_t *) ctl;
+   /* Read counters into expected slot */
+   for(int i=0;i<dash_ctl->num_events;i++) {
+      dash_ctl->counter[i] =
+		dash_hardware_read( i/*dash_ctl->which_counter[i]*/,
+				       dash_ctx );
+   }
 
 	return PAPI_OK;
 }
@@ -345,7 +352,7 @@ _dash_read( hwd_context_t *ctx, hwd_control_state_t *ctl,
    /* Read counters into expected slot */
    for(i=0;i<dash_ctl->num_events;i++) {
       dash_ctl->counter[i] =
-		dash_hardware_read( dash_ctl->which_counter[i],
+		dash_hardware_read( i/*dash_ctl->which_counter[i]*/,
 				       dash_ctx );
    }
 
@@ -370,12 +377,12 @@ _dash_write( hwd_context_t *ctx, hwd_control_state_t *ctl,
 	SUBDBG( "dash_write... %p %p", ctx, ctl );
 
         /* Write counters into expected slot */
-        for(i=0;i<dash_ctl->num_events;i++) {
-	   dash_hardware_write( dash_ctl->which_counter[i],
+    for(i=0;i<dash_ctl->num_events;i++) {
+	   dash_hardware_write( i /* dash_ctl->which_counter[i]*/,
 				   dash_ctx,
 				   events[i] );
 	}
-
+// 	memcpy(dash_ctx->values, events, sizeof(long long)*dash_ctl->num_events);
 	return PAPI_OK;
 }
 

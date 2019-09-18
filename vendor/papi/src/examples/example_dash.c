@@ -100,8 +100,7 @@ int main()
 	if ( (retval=PAPI_read(EventSet, values)) != PAPI_OK)
 		ERROR_RETURN(retval);
 
-	printf("The total instructions executed for the first loop are %lld \n", values[0] );
-	printf("The total cycles executed for the first loop are %lld \n",values[1]);
+	printf("First value %lld \n", values[0] );
 
 	/* our slow code again */
 	tmp=0;
@@ -110,15 +109,25 @@ int main()
 		tmp = i + tmp;
 	}
 
+	for(int i = 0; i < 6; ++i) {
+		values[i] = 42+i;
+	}
+	if((retval=PAPI_write(EventSet, values)) != PAPI_OK)
+		ERROR_RETURN(retval);
+	for(int i = 0; i < 6; ++i) {
+		values[i] = 0;
+	}
+
+// 	if ( (retval=PAPI_read(EventSet, values)) != PAPI_OK)
+// 		ERROR_RETURN(retval);
+
 	/* Stop counting and store the values into the array */
 	if ( (retval = PAPI_stop(EventSet, values)) != PAPI_OK)
 		ERROR_RETURN(retval);
 
-	printf("Total instructions executed are %lld \n", values[0] );
-	printf("Total cycles executed are %lld \n",values[1]);
-
-	printf("There is only %d event left in the eventset now\n", number);
-
+	for(int i = 0; i < 6; ++i) {
+		printf("First value[%i] %lld \n", i, values[i] );
+	}
 	/* free the resources used by PAPI */
 	PAPI_shutdown();
 

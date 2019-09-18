@@ -18,7 +18,7 @@ class stop_watch_t {
 public:
 	stop_watch_t(
 		desc execution_time = std::chrono::seconds(600),
-		size_t max_runs = 256,
+		size_t max_runs = 1,
 		std::function<void()>  barrier = [](){},
 		std::function<bool()> rank_checker = [](){ return true; },
 		std::function<size_t()> world_size = []() -> size_t { return 1; }
@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
 	const auto myid = dash::myid();
 	const auto size = dash::size();
 	using value_type = double;
-	const size_t dim = 2048;
+	const size_t dim = 512;
 	const auto rows_per_unit = (dim+size-1)/size;
 
 
