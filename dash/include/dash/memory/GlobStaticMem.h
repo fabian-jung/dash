@@ -123,8 +123,8 @@ public:
 
   using allocator_type = std::pmr::polymorphic_allocator<std::byte>;
 
-  using void_pointer             = dash::GlobPtr<void, GlobStaticMem>;
-  using const_void_pointer       = dash::GlobPtr<const void, GlobStaticMem>;
+  using void_pointer             = dash::GlobPtrImpl<void, GlobStaticMem>;
+  using const_void_pointer       = dash::GlobPtrImpl<const void, GlobStaticMem>;
   using local_void_pointer       = void*;
   using const_local_void_pointer = const void*;
 

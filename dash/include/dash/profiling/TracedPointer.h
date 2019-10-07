@@ -255,6 +255,7 @@ namespace std {
 template <class T>
 struct iterator_traits<dash::TracedPointerImpl<T>> {
 	using difference_type = typename dash::TracedPointerImpl<T>::difference_type;
+	using value_type = T;
 };
 
 }
