@@ -22,11 +22,11 @@
 #include "papi_internal.h"
 #include "papi_vector.h"
 #include "papi_memory.h"    /* defines papi_malloc(), etc. */
+#include "dash.h"
 
 /** This driver supports three counters counting at once      */
 /*  This is artificially low to allow testing of multiplexing */
-#define DASH_MAX_SIMULTANEOUS_COUNTERS 6
-#define DASH_MAX_MULTIPLEX_COUNTERS 6
+
 
 /* Declare our vector in advance */
 /* This allows us to modify the component info */
@@ -89,20 +89,17 @@ static int num_events = 0;
 /* Below is the actual "hardware implementation" of our dash counters */
 /*************************************************************************/
 
-#define DASH_GLOB_REF_LVALUE_ACCESS             0
-#define DASH_GLOB_REF_RVALUE_ACCESS             1
-#define DASH_GLOB_PTR_ACCESS                    2
-#define DASH_ONESIDED_PUT                       3
-#define DASH_ONESIDED_GET                       4
-#define DASH_LOCAL_PTR_ACCESS                   5
-
-#define DASH_TOTAL_EVENTS         6
-
 /** Holds per-thread information */
 typedef struct dash_context
 {
-     long long values[DASH_TOTAL_EVENTS];
+//      long long values[DASH_TOTAL_EVENTS];
 } dash_context_t;
+
+long long _papi_component_dash_values[DASH_TOTAL_EVENTS];
+
+long long* _papi_dash_values() {
+	return _papi_component_dash_values;
+}
 
 /** Code that resets the hardware.  */
 static void
@@ -110,7 +107,7 @@ dash_hardware_reset( dash_context_t *ctx )
 {
    /* reset per-thread count */
 	for(int i = 0; i < num_events; ++i) {
-		ctx->values[i] = 0;
+		_papi_component_dash_values[i] = 0;
 	}
 }
 
@@ -120,7 +117,7 @@ dash_hardware_reset( dash_context_t *ctx )
 static long long
 dash_hardware_read( int which_one, dash_context_t *ctx )
 {
-	return ctx->values[which_one];
+	return _papi_component_dash_values[which_one];
 }
 
 /** Code that writes event values.                        */
@@ -132,7 +129,7 @@ dash_hardware_write( int which_one,
 	if (which_one < 0 || which_one >= num_events) {
 		return PAPI_EINVAL;
 	}
-	ctx->values[which_one] = value;
+	_papi_component_dash_values[which_one] = value;
 	return PAPI_OK;
 }
 
@@ -382,7 +379,7 @@ _dash_write( hwd_context_t *ctx, hwd_control_state_t *ctl,
 				   dash_ctx,
 				   events[i] );
 	}
-// 	memcpy(dash_ctx->values, events, sizeof(long long)*dash_ctl->num_events);
+// 	memcpy(dash__papi_component_dash_values, events, sizeof(long long)*dash_ctl->num_events);
 	return PAPI_OK;
 }
 

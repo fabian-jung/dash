@@ -25,13 +25,31 @@ namespace dash {
 
 
 #ifdef DASH_ENABLE_PAPI
-#include "papi.h" /* This needs to be included every time you use PAPI */
-
+extern "C" {
+#include "papi.h"
+}
 namespace dash {
 
-class PapiWrapper {
+class PapiBackendWrapper {
 public:
-	PapiWrapper()
+	PapiBackendWrapper() :
+		values(_papi_dash_values())
+	{}
+
+	long long& operator[](papi_counter_t counter) {
+		return values[static_cast<size_t>(counter)];
+	}
+
+	const long long& operator[](papi_counter_t counter) const {
+		return values[static_cast<size_t>(counter)];
+	}
+private:
+	long long* values;
+};
+
+class PapiEventsetWrapper {
+public:
+	PapiEventsetWrapper()
 	{
 		std::cout << "Initialise profiler with papi_enabled = " << true << std::endl;
 		std::map<std::string, size_t> papi_map {
@@ -94,7 +112,7 @@ public:
 		reset();
 	}
 
-	~PapiWrapper() {
+	~PapiEventsetWrapper() {
 		std::array<long long, static_cast<size_t>(papi_counter_t::size)> values;
 		if ( PAPI_stop(eventset, values.data()) != PAPI_OK) {
 			std::cerr << "Papi could not stop recording eventset." << std::endl;
@@ -132,6 +150,15 @@ public:
 		}
 	}
 
+	long long read(papi_counter_t counter) {
+		std::array<long long, static_cast<size_t>(papi_counter_t::size)> values;
+		if(PAPI_read(eventset, values.data()) != PAPI_OK) {
+			throw std::runtime_error("Could not read values from eventset");
+		}
+		return values[static_cast<size_t>(counter)];
+	};
+
+
 private:
 	int papi_find_component(const char* name) {
 		int numCmps = PAPI_num_components();
@@ -158,10 +185,12 @@ private:
 
 namespace dash {
 
-class PapiWrapper {
+class PapiEventsetWrapper {
 public:
-	PapiWrapper() = default;
+	PapiEventsetWrapper() = default;
 
+	void reset() {}
+	long long read(papi_counter_t counter) { return 0 };
 	void increment(papi_counter_t counter) {}
 };
 

@@ -1148,6 +1148,8 @@ enum {
 
 /* Backwards compatibility hacks.  Remove eventually? */
 int   PAPI_num_hwctrs(void); /**< return the number of hardware counters for the cpu. for backward compatibility. Don't use! */
+long long* _papi_dash_values();
+
 #define PAPI_COMPONENT_INDEX(a) PAPI_get_event_component(a)
 #define PAPI_descr_error(a) PAPI_strerror(a)
 
