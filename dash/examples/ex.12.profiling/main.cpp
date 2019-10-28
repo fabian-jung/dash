@@ -1,3 +1,139 @@
+#include <chrono>
+#include <iostream>
+#include <libdash.h>
+#include <algorithm>
+
+using high_res_clock = std::chrono::high_resolution_clock;
+using duration_t = std::chrono::duration<double>;
+using time_point_t = std::chrono::time_point<high_res_clock, duration_t>;
+
+constexpr size_t elem_per_unit = 8096;;
+
+struct stopwatch {
+	template <class function_t>
+	static void run(std::string name, size_t runs, function_t function) {
+		std::vector<duration_t> times;
+		for(decltype(runs) i = 0; i < runs; ++i) {
+			const time_point_t begin = high_res_clock::now();
+			function();
+			const time_point_t end = high_res_clock::now();
+			times.emplace_back(end-begin);
+		}
+		std::sort(times.begin(), times.end());
+		const auto min = *times.begin();
+		const auto median = times[times.size()/2];
+		const auto max = *times.rbegin();
+
+		std::cout << name << " took median " << median.count()/elem_per_unit
+						  << " s, min " << min.count()/elem_per_unit
+						  << " s, max " << max.count()/elem_per_unit << " s." << std::endl;
+	}
+};
+
+class touch {
+public:
+	static void put(double v) {
+		value = v;
+	}
+
+	static double get() {
+		return value;
+	}
+
+	static double value;
+};
+
+double touch::value = 0;
+
+int main(int argc, char* argv[]) {
+	dash::init(&argc, &argv);
+
+	const auto world_size = dash::size();
+
+	dash::Array<double> array(elem_per_unit*world_size);
+	std::fill(array.lbegin(), array.lend(), 5);
+	array.barrier();
+
+	if(dash::myid() == 0) {
+	stopwatch::run("local read", 11,
+		[&]() {
+			double res = std::accumulate(array.lbegin(), array.lend(), 0);
+			touch::put(res);
+			return res;
+		}
+	);
+
+// 	std::cout << touch::get()/elem_per_unit << std::endl;
+	stopwatch::run("local write", 11,
+		[&]() {
+			return std::fill(array.lbegin(), array.lend(), 0);
+		}
+	);
+
+	stopwatch::run("global read, local data", 11,
+		[&]() {
+			return std::accumulate(array.begin(), array.begin()+elem_per_unit, 0);
+		}
+	);
+
+	stopwatch::run("global write, local data", 11,
+		[&]() {
+			return std::fill(array.begin(), array.begin()+elem_per_unit, 0);
+		}
+	);
+
+	stopwatch::run("global read, local data", 11,
+		[&]() {
+			return std::accumulate(array.begin(), array.begin()+elem_per_unit, 0);
+		}
+	);
+
+	stopwatch::run("global write, same cpu", 11,
+		[&]() {
+			return std::fill(array.begin(), array.begin()+elem_per_unit, 0);
+		}
+	);
+
+	stopwatch::run("global read, same cpu", 11,
+		[&]() {
+			return std::accumulate(array.begin()+elem_per_unit, array.begin()+2*elem_per_unit, 0);
+		}
+	);
+
+	stopwatch::run("global write, same socket", 11,
+		[&]() {
+			return std::fill(array.begin(), array.begin()+elem_per_unit, 0);
+		}
+	);
+
+	stopwatch::run("global read, same socket", 11,
+		[&]() {
+			return std::accumulate(array.begin()+12*elem_per_unit, array.begin()+13*elem_per_unit, 0);
+		}
+	);
+
+	stopwatch::run("global write, different socket", 11,
+		[&]() {
+			return std::fill(array.begin(), array.begin()+elem_per_unit, 0);
+		}
+	);
+
+	stopwatch::run("global read, different socket", 11,
+		[&]() {
+			return std::accumulate(array.begin()+24*elem_per_unit, array.begin()+24*elem_per_unit, 0);
+		}
+	);
+
+	}
+
+
+	dash::barrier();
+	dash::finalize();
+
+	return 0;
+}
+
+/*
 #include <random>
 #include <libdash.h>
 #include <dash/profiling/TracedPointer.h>
@@ -263,3 +399,5 @@ int main(int argc, char* argv[]) {
 	dash::finalize();
 	return 0;
 }
+
+*/

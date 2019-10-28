@@ -184,13 +184,28 @@ private:
 #else
 
 namespace dash {
+class PapiBackendWrapper {
+public:
+	PapiBackendWrapper() = default;
+
+	long long& operator[](papi_counter_t counter) {
+		return v;
+	}
+
+	const long long& operator[](papi_counter_t counter) const {
+		return v;
+	}
+private:
+	long long v;
+
+};
 
 class PapiEventsetWrapper {
 public:
 	PapiEventsetWrapper() = default;
 
 	void reset() {}
-	long long read(papi_counter_t counter) { return 0 };
+	long long read(papi_counter_t counter) { return 0; };
 	void increment(papi_counter_t counter) {}
 };
 
