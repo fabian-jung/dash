@@ -135,48 +135,48 @@ public:
 	void trackOnesidedPut(const dart_gptr_t& gptr, size_t bytes) {
 		if(filter.onesided_communication) {
 			fetch_counter(gptr, &ContainerCounter::onesided_put_byte) += bytes;
-			papi[papi_counter_t::onesided_put_num] =
-				++fetch_counter(gptr, &ContainerCounter::onesided_put_num);
+			++papi[papi_counter_t::onesided_put_num];
+			++fetch_counter(gptr, &ContainerCounter::onesided_put_num);
 		}
 	}
 
 	void trackOnesidedGet(const dart_gptr_t& gptr, size_t bytes) {
 		if(filter.onesided_communication) {
 			fetch_counter(gptr, &ContainerCounter::onesided_get_byte) += bytes;
-			papi[papi_counter_t::onesided_get_num] =
-				++fetch_counter(gptr, &ContainerCounter::onesided_get_num);
+			++papi[papi_counter_t::onesided_get_num];
+			++fetch_counter(gptr, &ContainerCounter::onesided_get_num);
 		}
 	}
 
 	template<class T>
 	void trackRead(const GlobRefImpl<T>& ref) {
 		if(filter.global_reference) {
-			papi[papi_counter_t::glob_ref_read] =
-				++fetch_counter(ref.dart_gptr(), &ContainerCounter::glob_ref_read);
+			++papi[papi_counter_t::glob_ref_read];
+			++fetch_counter(ref.dart_gptr(), &ContainerCounter::glob_ref_read);
 		}
 	}
 
 	template<class T>
 	void trackWrite(const GlobRefImpl<T>& ref) {
 		if(filter.global_reference) {
-			papi[papi_counter_t::glob_ref_write] =
-				++fetch_counter(ref.dart_gptr(), &ContainerCounter::glob_ref_write);
+			++papi[papi_counter_t::glob_ref_write];
+			++fetch_counter(ref.dart_gptr(), &ContainerCounter::glob_ref_write);
 		}
 	}
 
 	template <class T, class MemSpaceT>
 	void trackDeref(const GlobPtrImpl<T, MemSpaceT>& ptr) {
 		if(filter.global_pointer) {
-			papi[papi_counter_t::glob_ptr_deref] =
-				++fetch_counter(ptr.dart_gptr(), &ContainerCounter::glob_ptr_deref);
+			++papi[papi_counter_t::glob_ptr_deref];
+			++fetch_counter(ptr.dart_gptr(), &ContainerCounter::glob_ptr_deref);
 		}
 	}
 
 	template <class T>
 	void trackDeref(const T* ptr) {
 		if(filter.local_pointer) {
-			papi[papi_counter_t::local_ptr_deref] =
-				++local_ptr_deref;
+			++papi[papi_counter_t::local_ptr_deref];
+			++local_ptr_deref;
 		}
 	}
 
@@ -391,6 +391,13 @@ private:
 		size(dash::size())
 	{
 		container_map.get_inner()[nullptr].name = "<Unknown container>";
+		papi[papi_counter_t::glob_ptr_deref] = 0;
+		papi[papi_counter_t::glob_ref_read] = 0;
+		papi[papi_counter_t::glob_ref_write] = 0;
+		papi[papi_counter_t::local_ptr_deref] = 0;
+		papi[papi_counter_t::onesided_get_num] = 0;
+		papi[papi_counter_t::onesided_put_num] = 0;
+
 	}
 
 	using gptr_identififaction_t =

@@ -9,8 +9,8 @@
 
 namespace dash {
 	enum class papi_counter_t : size_t {
-		glob_ref_read = 0,
-		glob_ref_write = 1,
+		glob_ref_write = 0,
+		glob_ref_read = 1,
 // 		glob_ptr_leaked = 2;
 		glob_ptr_deref = 2,
 		onesided_put_num = 3,
